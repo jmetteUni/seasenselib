@@ -8,6 +8,7 @@ import pandas as pd
 import xarray as xr
 from datetime import datetime
 from seasenselib.readers.base import AbstractReader
+import seasenselib.parameters as params
 
 
 class AdcpMatlabRdadcpReader(AbstractReader):
@@ -268,7 +269,7 @@ class AdcpMatlabRdadcpReader(AbstractReader):
             },
             coords=coords,
             attrs={
-                "Conventions": "CF-1.8",
+                "Conventions": "CF-1.13",
                 "title": "ADCP (RDI/Teledyne Workhorse) time series",
                 "source": "ADCP MATLAB export (adcp struct)",
                 "instrument_type": str(getattr(self._cfg, "name", "wh-adcp")),
@@ -302,59 +303,37 @@ class AdcpMatlabRdadcpReader(AbstractReader):
             ),
         })
 
-        # variable attributes
-        ds["east_velocity"].attrs = {
-            "units": "m s-1", "long_name": "Eastward sea water velocity",
-            "standard_name": "eastward_sea_water_velocity"
-        }
-        ds["north_velocity"].attrs = {
-            "units": "m s-1", "long_name": "Northward sea water velocity",
-            "standard_name": "northward_sea_water_velocity"
-        }
+        # Minimal variable attributes with units (stages will add CF compliance)
+        ds["east_velocity"].attrs = {"units": "m s-1"}
+        ds["north_velocity"].attrs = {"units": "m s-1"}
         ds["up_velocity"].attrs = {
-            "units": "m s-1", "long_name": "Upward sea water velocity",
-            "standard_name": "upward_sea_water_velocity",
+            "units": "m s-1",
             "note": "Positive upward (heuristic conversion from cm/s applied if needed)."
         }
-
-        ds["depth"].attrs = {
-            "units": "m", "long_name": "Instrument depth (positive down)",
-            "standard_name": "depth", "positive": "down"
-        }
+        ds["depth"].attrs = {"units": "m", "positive": "down"}
         ds["z"].attrs = {
-            "units": "m", "long_name": "Height relative to mean sea level (positive upward)",
-            "positive": "up", "comment": "z(bin,time) = -depth(time) ± range(bin) depending on orientation"
+            "units": "m", "positive": "up",
+            "comment": "z(bin,time) = -depth(time) ± range(bin) depending on orientation"
         }
-        ds["range"].attrs = {"units": "m", "long_name": "Cell center range from transducer"}
-
-        ds["pressure"].attrs = {
-            "units": P["pres_units"], "long_name": "Sea water pressure",
-            "standard_name": "sea_water_pressure"
-        }
-        ds["pressure_std"].attrs = {"units": P["pres_units"], "long_name": "Std of pressure"}
-
+        ds["range"].attrs = {"units": "m"}
+        ds["pressure"].attrs = {"units": P["pres_units"]}
+        ds["pressure_std"].attrs = {"units": P["pres_units"]}
+        
         for nm in ("heading", "pitch", "roll", "heading_std", "pitch_std", "roll_std"):
             ds[nm].attrs["units"] = "degree"
-
-        ds["temperature"].attrs = {
-            "units": "degree_Celsius", "standard_name": "sea_water_temperature",
-            "long_name": "ADCP temperature"
-        }
-        ds["salinity"].attrs = {
-            "units": "1e-3", "long_name": "Salinity (practical)", "standard_name": "sea_water_practical_salinity"
-        }
-        ds["ensemble_number"].attrs = {"long_name": "Ensemble number (index)", "units": "1"}
-
-        ds["correlation_magnitude"].attrs = {"units": "1", "long_name": "Correlation magnitude"}
-        ds["echo_intensity"].attrs = {"units": "counts", "long_name": "Echo intensity (amplitude)"}
-        ds["status"].attrs = {"units": "1", "long_name": "Status flags"}
-        ds["percent_good"].attrs = {"units": "percent", "long_name": "Percent good"}
-
-        ds["bt_range"].attrs = {"units": "m", "long_name": "Bottom-track range"}
-        ds["bt_velocity"].attrs = {"units": "m s-1", "long_name": "Bottom-track velocity"}
-        ds["bt_correlation"].attrs = {"units": "1", "long_name": "Bottom-track correlation"}
-        ds["bt_amplitude"].attrs = {"units": "counts", "long_name": "Bottom-track amplitude"}
-        ds["bt_percent_good"].attrs = {"units": "percent", "long_name": "Bottom-track percent good"}
+        
+        ds["temperature"].attrs = {"units": "degree_Celsius"}
+        ds["salinity"].attrs = {"units": "1e-3"}
+        ds["ensemble_number"].attrs = {"units": "1"}
+        ds["correlation_magnitude"].attrs = {"units": "1"}
+        ds["echo_intensity"].attrs = {"units": "counts"}
+        ds["status"].attrs = {"units": "1"}
+        ds["percent_good"].attrs = {"units": "percent"}
+        ds["bt_range"].attrs = {"units": "m"}
+        ds["bt_velocity"].attrs = {"units": "m s-1"}
+        ds["bt_correlation"].attrs = {"units": "1"}
+        ds["bt_amplitude"].attrs = {"units": "counts"}
+        ds["bt_percent_good"].attrs = {"units": "percent"}
 
         # allow your metadata mapping hook to add/override
         for key in list(ds.data_vars.keys()) + list(ds.coords.keys()):
@@ -366,6 +345,25 @@ class AdcpMatlabRdadcpReader(AbstractReader):
         """Load data from the MATLAB file and return an xarray Dataset."""
         parsed = self._parse(self.input_file)
         return self._create_xarray_dataset(parsed)
+
+    @classmethod
+    def format_mappings(cls) -> dict[str, list]:
+        """Return ADCP rdadcp format-specific variable name mappings.
+        
+        Returns
+        -------
+        dict[str, list]
+            Dictionary mapping standard names to ADCP format-specific aliases.
+        """
+        return {
+            params.EAST_VELOCITY: ['east_velocity'],
+            params.NORTH_VELOCITY: ['north_velocity'],
+            params.UP_VELOCITY: ['up_velocity'],
+            params.DEPTH: ['depth'],
+            params.PRESSURE: ['pressure'],
+            params.TEMPERATURE: ['temperature'],
+            params.SALINITY: ['salinity'],
+        }
 
     @classmethod
     def format_key(cls) -> str:

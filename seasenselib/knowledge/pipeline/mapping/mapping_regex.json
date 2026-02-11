@@ -1,0 +1,14 @@
+[
+  {
+    "pattern": "^temp(?:erature)?(?:_\\d+)?$",
+    "canonical": "temperature"
+  },
+  {
+    "pattern": "^sal(?:inity)?(?:_\\d+)?$",
+    "canonical": "salinity"
+  },
+  {
+    "pattern": "^pres(?:sure)?(?:_\\d+)?$",
+    "canonical": "pressure"
+  }
+]

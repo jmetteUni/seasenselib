@@ -1,0 +1,75 @@
+{
+  "base_keywords": [
+    "oceanography",
+    "in situ",
+    "level-1"
+  ],
+  "source_format_attr_keys": [
+    "source_format_name",
+    "source_format",
+    "raw_format"
+  ],
+  "time_coord_names": [
+    "time"
+  ],
+  "raw_filename_attr": "raw_filename",
+  "format_token_map": {
+    "sbe": "seabird"
+  },
+  "format_token_blacklist": [
+    "legacy",
+    "auto",
+    "default"
+  ],
+  "lat_names": [
+    "latitude",
+    "lat",
+    "y"
+  ],
+  "lon_names": [
+    "longitude",
+    "lon",
+    "x"
+  ],
+  "depth_names": [
+    "depth"
+  ],
+  "depth_alt_names": [
+    "z"
+  ],
+  "depth_unit_safe": [
+    "m",
+    "meter",
+    "meters",
+    "metre",
+    "metres"
+  ],
+  "aux_variable_suffixes": [
+    "_qc",
+    "_quality_flag",
+    "_original"
+  ],
+  "aux_variable_substrings": [
+    "flag",
+    "qc",
+    "quality",
+    "status",
+    "mask",
+    "scan"
+  ],
+  "exclude_variable_names": [
+    "datasetid",
+    "dataset_id"
+  ],
+  "keyword_prefix_strip": [
+    "sea_water_",
+    "sea_",
+    "ocean_",
+    "water_"
+  ],
+  "keyword_standard_name_overrides": {
+    "electrical_conductivity": "conductivity",
+    "volume_fraction_of_oxygen_in_sea_water": "oxygen",
+    "mole_fraction_of_oxygen_in_sea_water": "oxygen"
+  }
+}

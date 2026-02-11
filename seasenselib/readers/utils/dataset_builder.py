@@ -6,7 +6,7 @@ with proper structure, coordinates, and data arrays.
 """
 
 from __future__ import annotations
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 import numpy as np
@@ -88,13 +88,17 @@ class DatasetBuilder:
         if depth_array is not None:
             coords[depth_name] = ([params.TIME], depth_array)
 
+        now_local = datetime.now().astimezone()
+        now_utc = now_local.astimezone(timezone.utc)
+
         return xr.Dataset(
             data_vars=dict(),
             coords=coords,
             attrs=dict(
                 latitude=latitude,
                 longitude=longitude,
-                CreateTime=datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+                CreateTime=now_local.isoformat(),
+                CreateTime_UTC=now_utc.isoformat().replace("+00:00", "Z"),
                 DataType='TimeSeries',
             )
         )

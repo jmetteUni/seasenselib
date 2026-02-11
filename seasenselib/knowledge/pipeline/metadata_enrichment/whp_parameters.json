@@ -1,0 +1,34 @@
+{
+  "description": "Minimal WHP-Exchange parameter mapping for canonical variables.",
+  "attribute_name": "whp_parameter",
+  "apply_to": [
+    "data_vars",
+    "coords"
+  ],
+  "allow_numbered": true,
+  "exclude_names": [
+    "flag"
+  ],
+  "exclude_suffixes": [
+    "_qc",
+    "_quality_flag",
+    "_flag",
+    "_status",
+    "_mask",
+    "_original"
+  ],
+  "parameter_map": {
+    "altimeter": "CTDALTIMETER",
+    "pressure": "CTDPRS",
+    "temperature": "CTDTMP",
+    "salinity": "CTDSAL",
+    "conductivity": "CTDCOND",
+    "conservative_temperature": "CTDCT",
+    "potential_temperature": "THETA",
+    "depth": "CTDDEPTH",
+    "latitude": "LATITUDE",
+    "longitude": "LONGITUDE",
+    "oxygen": "CTDOXY",
+    "turbidity": "TURBIDITY"
+  }
+}

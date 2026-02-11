@@ -21,11 +21,12 @@ API Structure:
 - ssl.list_readers() : List available readers (including plugins)
 - ssl.list_writers() : List available writers (including plugins)
 - ssl.list_plotters(): List available plotters (including plugins)
+- ssl.list_parameters(): List canonical parameter names
 - ssl.list_all()     : List all available resources
 """
 
 # Core API imports - always available
-from .api import read, write, plot, formats, list_readers, list_writers, list_plotters, list_all
+from .api import read, write, plot, formats, list_readers, list_writers, list_plotters, list_parameters, list_all
 
 # Lazy loading for heavy modules
 from importlib import import_module
@@ -71,6 +72,7 @@ __all__ = [
     'list_readers',
     'list_writers', 
     'list_plotters',
+    'list_parameters',
     'list_all',
     '__version__'
 ]

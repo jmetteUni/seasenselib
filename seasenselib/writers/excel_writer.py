@@ -2,8 +2,11 @@
 Module for writing sensor data to Excel files.
 """
 
+import logging
 from seasenselib.writers.base import AbstractWriter
 import seasenselib.parameters as params
+
+logger = logging.getLogger(__name__)
 
 class ExcelWriter(AbstractWriter):
     """ Writes sensor data from a xarray Dataset to an Excel file. 
@@ -61,7 +64,9 @@ class ExcelWriter(AbstractWriter):
         df = data.to_dataframe()
 
         # Write the dataframe to the Excel file
+        logger.info("Writing Excel file to '%s'", file_name)
         df.to_excel(file_name, engine='openpyxl')
+        logger.info("Wrote Excel file to '%s'", file_name)
 
     @staticmethod
     def file_extension() -> str:

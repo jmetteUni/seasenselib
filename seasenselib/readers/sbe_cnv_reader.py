@@ -3,6 +3,10 @@
 
 from __future__ import annotations
 import re
+import logging
+import importlib
+import sys
+import types
 from datetime import datetime
 import pandas as pd
 import numpy as np
@@ -10,6 +14,31 @@ import xarray as xr
 
 from seasenselib.readers.base import AbstractReader
 import seasenselib.parameters as params
+
+logger = logging.getLogger(__name__)
+
+
+def _ensure_lazy_pylab() -> None:
+    """Provide a lazy pylab module to avoid importing matplotlib on read."""
+    if 'pylab' in sys.modules:
+        return
+
+    class _LazyPylab(types.ModuleType):
+        _module = None
+
+        def _load(self):
+            if self._module is None:
+                self._module = importlib.import_module('matplotlib.pylab')
+                sys.modules['pylab'] = self._module
+            return self._module
+
+        def __getattr__(self, name):
+            return getattr(self._load(), name)
+
+        def __dir__(self):
+            return dir(self._load())
+
+    sys.modules['pylab'] = _LazyPylab('pylab')
 
 
 class SbeCnvReader(AbstractReader):
@@ -169,7 +198,7 @@ class SbeCnvReader(AbstractReader):
             
             return time_coords_normalized
         except Exception as e:
-            print(f"Error normalizing time_coords: {e}")
+            logger.warning("Error normalizing time coordinates: %s", e)
             return time_coords
 
     def __calculate_time_coordinates(self, xarray_data: dict, cnv: pycnv.pycnv, max_count: int) -> np.ndarray | None:
@@ -196,7 +225,7 @@ class SbeCnvReader(AbstractReader):
         start_time_from_header = self.__get_start_time_from_header(cnv.header)
         if start_time_from_header:
             offset_datetime = start_time_from_header
-            #print(f"Using header start_time: {offset_datetime}")
+            logger.debug(f"Using header start_time: {offset_datetime}")
         else:
             # Fallback to cnv.date
             if cnv.date is not None:
@@ -205,7 +234,7 @@ class SbeCnvReader(AbstractReader):
                 # Final fallback - use January 1st of current year
                 current_year = datetime.now().year
                 offset_datetime = pd.to_datetime(f"{current_year}-01-01 00:00:00")
-            #print(f"Using cnv.date fallback: {offset_datetime}")
+            logger.debug(f"Using cnv.date fallback: {offset_datetime}")
 
         # Define the time coordinates as an array of datetime values
         time_coords = None  # Initialize to avoid unbound variable error
@@ -423,7 +452,7 @@ class SbeCnvReader(AbstractReader):
         
         except Exception as e:
             # If XML parsing fails, fall back to regex extraction
-            print(f"XML parsing failed, trying regex fallback: {e}")
+            logger.warning("XML parsing failed, trying regex fallback: %s", e)
             return self.__extract_sensor_metadata_from_regex(cnv_header)
         
         return sensor_metadata
@@ -503,72 +532,6 @@ class SbeCnvReader(AbstractReader):
         
         return sensor_metadata
     
-    def __calculate_depth_from_pressure(self, xarray_data, xarray_labels, xarray_units, cnv):
-        """Calculate depth from pressure data using GSW library.
-
-        Parameters
-        ----------
-        xarray_data
-            Dictionary containing sensor data.
-        xarray_labels
-            Dictionary containing data labels.
-        xarray_units
-            Dictionary containing data units.
-        cnv
-            CNV object containing metadata.
-
-        Returns
-        -------
-        numpy.ndarray | None 
-            Depth values in meters, or None if pressure not available.
-            
-        Notes
-        -----
-        If latitude is not available from CNV metadata or data columns, a default
-        value of 45 degrees is used. This is standard practice in oceanography for cases
-        like moored instruments. The depth error from using 45 degrees instead of actual
-        latitude is typically less than 0.3m at typical CTD depths (less than 0.5m at 100 dbar).
-        """
-
-        import gsw
-
-        depth = None
-
-        for alias in params.default_mappings[params.PRESSURE]:
-            if alias in xarray_data:
-                # rename key
-                xarray_data[params.PRESSURE] = xarray_data[alias]
-                xarray_labels[params.PRESSURE] = xarray_labels[alias]
-                xarray_units[params.PRESSURE] = xarray_units[alias]
-                break
-        
-        if params.PRESSURE in xarray_data:
-            lat = cnv.lat
-            
-            # Check if lat is None or NaN
-            if lat is None or (isinstance(lat, float) and np.isnan(lat)):
-                if params.LATITUDE in xarray_data:
-                    lat = xarray_data[params.LATITUDE][0]
-                else:
-                    lat = None
-            
-            # Use default latitude if not available and fix_missing_coords is enabled
-            if lat is None or (isinstance(lat, float) and np.isnan(lat)):
-                if self._fix_missing_coords:
-                    lat = 45.0
-                    print(f"Warning: Latitude not found in CNV file '{self.input_file}'. "
-                          f"Using default latitude of {lat} degrees for depth calculation. "
-                          f"This is common for moored instruments and typically introduces < 0.3m error. "
-                          f"Set fix_missing_coords=False to disable this behavior.")
-                else:
-                    # If fix_missing_coords is disabled, lat remains None and will produce NaN depths
-                    print(f"Warning: Latitude not found in CNV file '{self.input_file}'. "
-                          f"Depth values will be NaN. Set fix_missing_coords=True to use default latitude.")
-            
-            depth = gsw.conversions.z_from_p(xarray_data[params.PRESSURE], lat)
-
-        return depth
-
     def _sanitize_cnv_file(self, file):
         """ Sanitizes a CNV file to fix known issues that pycnv cannot handle.
         
@@ -600,11 +563,18 @@ class SbeCnvReader(AbstractReader):
                 if re.match(r'^# start_time \= [A-Za-z]{3} \d{1,2} \d{4} \d{2}:\d{2}:\d{2}\s+$', line):
                     line = line.rstrip() + '\n'
                     needs_sanitization = True
-                    print(f"Warning: Fixed trailing whitespace in start_time at line {line_num}")
+                    logger.debug(
+                        "Fixed trailing whitespace in start_time at line %d",
+                        line_num
+                    )
                 
                 # Fix 2: Skip lines starting with multiple asterisks (malformed)
                 if re.match(r'^\* \*', line):
-                    print(f"Warning: Skipping malformed line {line_num}: {line.strip()}")
+                    logger.warning(
+                        "Skipping malformed line %d: %s",
+                        line_num,
+                        line.strip()
+                    )
                     needs_sanitization = True
                     continue
                 
@@ -618,7 +588,7 @@ class SbeCnvReader(AbstractReader):
             try:
                 with os.fdopen(temp_fd, 'w', encoding='utf-8') as f:
                     f.writelines(sanitized_lines)
-                print(f"Info: Created sanitized temporary file for pycnv processing")
+                logger.debug("Created sanitized temporary file for pycnv processing")
                 return temp_path, True
             except Exception as e:
                 # Clean up temp file if writing fails
@@ -631,6 +601,21 @@ class SbeCnvReader(AbstractReader):
         
         return file, False
 
+    def _read_raw_header(self, file: str) -> str | None:
+        """Read the CNV header verbatim (up to *END*)."""
+        try:
+            lines = []
+            with open(file, 'r', encoding='utf-8', errors='replace') as handle:
+                for line in handle:
+                    lines.append(line.rstrip("\n"))
+                    if line.strip().startswith("*END*"):
+                        break
+            if lines:
+                return "\n".join(lines)
+        except Exception as exc:
+            logger.debug("Failed to read raw CNV header: %s", exc)
+        return None
+
     def _load_data(self) -> xr.Dataset:
         """ Reads a CNV file and converts it to a xarray Dataset.
         
@@ -640,10 +625,12 @@ class SbeCnvReader(AbstractReader):
             The loaded dataset.
         """
 
+        _ensure_lazy_pylab()
         import pycnv
         import os
 
         # Sanitize the file if sanitize_input is enabled (fixes pycnv incompatibilities)
+        self._raw_header = self._read_raw_header(self.input_file)
         if self._sanitize_input:
             file_to_read, was_sanitized = self._sanitize_cnv_file(self.input_file)
         else:
@@ -712,19 +699,11 @@ class SbeCnvReader(AbstractReader):
         # Assign CNV-specific metadata (preserves CNV units, adds original names/labels)
         ds = self.__assign_cnv_metadata(ds, xarray_labels, xarray_units, channel_names, cnv)
 
-        # Rename to standard names
-        ds = self._perform_default_postprocessing(ds)
+        # Depth derivation is handled by the pipeline derivation stage.
 
-        # If "depth" not in ds, create depth variable
-        if params.DEPTH not in ds:
-            depth_data = self.__calculate_depth_from_pressure(xarray_data, xarray_labels, xarray_units, cnv)
-            if depth_data is not None:
-                ds[params.DEPTH] = (["time"], depth_data)
-                if self._config_assign_metadata:
-                    self._assign_metadata_for_key_to_xarray_dataset(ds, params.DEPTH)
-
-        # Derive oceanographic parameters (density, potential temperature)
-        ds = self._derive_oceanographic_parameters(ds)
+        # Parameter derivation (density, potential_temperature, sound_speed) is 
+        # handled by the parameter_derivation layer in the pipeline derivation stage.
+        # This keeps readers focused on data loading, not processing.
 
         # Check for bad flag
         bad_flag = self.__get_bad_flag(cnv.header)
@@ -737,7 +716,7 @@ class SbeCnvReader(AbstractReader):
             try:
                 os.unlink(file_to_read)
             except Exception as e:
-                print(f"Warning: Could not delete temporary file {file_to_read}: {e}")
+                logger.warning("Could not delete temporary file %s: %s", file_to_read, e)
 
         return ds
 
@@ -752,3 +731,24 @@ class SbeCnvReader(AbstractReader):
     @classmethod
     def file_extension(cls) -> str | None:
         return '.cnv'
+    
+    @classmethod
+    def format_mappings(cls) -> dict:
+        """Get SeaBird CNV format-specific variable name mappings.
+        
+        Returns:
+            Dictionary mapping canonical parameter names to SeaBird-specific
+            variable name patterns commonly found in CNV files.
+        """
+        return {
+            params.TEMPERATURE: ['t090C', 't068', 't190C', 't168', 'tv290C'],
+            params.SALINITY: ['sal00', 'sal11'],
+            params.CONDUCTIVITY: ['c0mS/cm', 'c0S/m', 'c1mS/cm', 'c1S/m', 'cond0mS/cm', 'cond1mS/cm'],
+            params.PRESSURE: ['prdM', 'prDM', 'prSM', 'prM', 'pr50M', 'pr200M', 'pr350M'],
+            params.DEPTH: ['depSM'],
+            params.OXYGEN: ['sbeox0V', 'sbeox0', 'sbeox0ML/L', 'sbeox0Mm/Kg', 'sbeox1V', 'sbeox1ML/L'],
+            params.TURBIDITY: ['turbWETntu0'],
+            params.FLUORESCENCE: ['flECO-AFL'],
+            params.DENSITY: ['sigma-t00', 'sigma-t11', 'sigma-theta00', 'sigma-theta11'],
+            params.POTENTIAL_TEMPERATURE: ['potemp090C', 'potemp190C'],
+        }

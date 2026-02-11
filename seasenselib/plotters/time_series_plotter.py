@@ -7,7 +7,6 @@ with advanced features like dual y-axes, normalization, and custom styling.
 
 from __future__ import annotations
 from typing import List, Tuple
-import matplotlib.pyplot as plt
 import numpy as np
 from seasenselib.plotters.base import AbstractPlotter
 import seasenselib.parameters as params
@@ -157,6 +156,7 @@ class TimeSeriesPlotter(AbstractPlotter):
         if self.data is None:
             raise ValueError("No data available to plot.")
 
+        plt = self._get_plt()
         _fig, ax1 = plt.subplots(figsize=(12, 6))
 
         # Set up colors and line styles
@@ -287,6 +287,7 @@ class TimeSeriesPlotter(AbstractPlotter):
                       loc='best', framealpha=0.9)
 
         # Format x-axis dates
+        plt = self._get_plt()
         plt.gcf().autofmt_xdate()
         plt.tight_layout()
 

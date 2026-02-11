@@ -80,11 +80,19 @@ class DataIOManager:
         # Detect format
         format_key = self.format_detector.detect_format(input_file, format_hint)
 
+        return_metadata = bool(kwargs.pop('return_metadata', False))
+
         # Create reader and get data
         reader = self.reader_factory.create_reader(
             format_key, input_file, header_input_file, **kwargs
         )
-        return reader.data
+        data = reader.data
+
+        if return_metadata:
+            metadata = getattr(reader, 'processing_metadata', None)
+            return data, metadata
+
+        return data
 
     def write_data(self, data: Any, output_file: str, format_hint: Optional[str] = None) -> None:
         """

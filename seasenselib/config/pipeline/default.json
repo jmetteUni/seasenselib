@@ -1,0 +1,81 @@
+{
+  "stages": [
+    {
+      "name": "mapping",
+      "config": {
+        "handlers": [
+          "user_mapping",
+          "user_config_mapping",
+          "format_specific",
+          "default_mapping",
+          "regex_mapping"
+        ]
+      }
+    },
+    {
+      "name": "unit_handling",
+      "config": {
+        "handlers": [
+          "normalize"
+        ]
+      }
+    },
+    {
+      "name": "derivation",
+      "config": {
+        "handlers": [
+          "density",
+          "depth",
+          "potential_temperature",
+          "conservative_temperature",
+          "sound_speed"
+        ]
+      }
+    },
+    {
+      "name": "metadata_extraction",
+      "config": {
+        "handlers": [
+          "attributes",
+          "global_attributes"
+        ]
+      }
+    },
+    {
+      "name": "metadata_enrichment",
+      "config": {
+        "handlers": [
+          "cf",
+          "acdd",
+          "acdd_auto",
+          "whp",
+          "user_metadata"
+        ]
+      }
+    },
+    {
+      "name": "validation",
+      "config": {
+        "validators": [
+          "cf",
+          "unit"
+        ]
+      }
+    },
+    {
+      "name": "finalization",
+      "config": {
+        "handlers": [
+          "raw_metadata",
+          "processor_metadata",
+          "global_attributes",
+          "sorting"
+        ]
+      }
+    }
+  ],
+  "global": {
+    "profile": "default",
+    "description": "Conservative L1 pipeline - no unit conversion."
+  }
+}

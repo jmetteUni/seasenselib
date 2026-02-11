@@ -5,8 +5,8 @@ build-backend = "setuptools.build_meta"
 [project]
 
 name = "seasenselib"
-version = "0.4.1"
-description = "Read, convert, and plot oceanographic sensor data from moored instruments."
+version = "0.5.0"
+description = "Read, convert, and plot oceanographic sensor data."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { file = "LICENSE" }
@@ -68,6 +68,7 @@ dependencies = [
   "pylablib",
   "matplotlib",
   "netcdf4",
+  "pint",
   "gsw",
   "pyrsktools",
   "setuptools",
@@ -93,5 +94,10 @@ Download    = "https://pypi.org/project/seasenselib/"
 [project.scripts]
 seasenselib = "seasenselib.__main__:main"
 
+
 [tool.setuptools.packages.find]
 where = ["."]
+
+[tool.setuptools.package-data]
+"seasenselib.knowledge" = ["**/*.json"]
+"seasenselib.config.pipeline" = ["*.json"]

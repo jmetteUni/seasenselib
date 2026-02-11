@@ -1,0 +1,13 @@
+{
+  "Amplitude (Beam1)": "east_amplitude",
+  "Amplitude (Beam2)": "north_amplitude",
+  "Amplitude (Beam3)": "up_amplitude",
+  "Pressure": "pressure",
+  "Soundspeed": "speed_of_sound",
+  "Temp": "temperature",
+  "Temperature": "temperature",
+  "Velocity (Beam1|X|East)": "east_velocity",
+  "Velocity (Beam2|Y|North)": "north_velocity",
+  "Velocity (Beam3|Z|Up)": "up_velocity",
+  "datetime": "time"
+}

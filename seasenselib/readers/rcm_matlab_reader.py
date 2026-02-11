@@ -6,6 +6,7 @@ from __future__ import annotations
 import pandas as pd
 import xarray as xr
 from seasenselib.readers.base import AbstractReader
+import seasenselib.parameters as params
 
 class RcmMatlabReader(AbstractReader):
     """Reader which converts RCM data stored in MATLAB .mat files into xarray dataset."""
@@ -73,60 +74,49 @@ class RcmMatlabReader(AbstractReader):
         return df
 
     def _create_xarray_dataset(self, df):
-        """create xarray dataset from pandas dataframe"""
-
+        """Create xarray dataset from pandas dataframe.
+        
+        Returns raw dataset with format-specific variable names.
+        Variable mapping and metadata enrichment handled by stages.
+        """
         ds = xr.Dataset.from_dataframe(df)
-
-        # rename variables after cf convention
-        ds = ds.rename_vars({
-            'u': 'east_velocity', 
-            'v': 'north_velocity', 
-            'temp': 'temperature', 
-            'cond': 'conductivity', 
-            'pres': 'pressure', 
-            'vdir': 'vdir', 
-            'vmag': 'vmag'
-        })
-
-        #add metadata for cf compliance
-        ds["east_velocity"].attrs = {
-            "units": "m/s", 
-            "long_name": "Eastward velocity", 
-            "standard_name": "eastward_sea_water_velocity"
-        }
-        ds["north_velocity"].attrs = {
-            "units": "m/s", 
-            "long_name": "Northward velocity", 
-            "standard_name": "northward_sea_water_velocity"
-        }
-        ds["temperature"].attrs = {
-            "units": "°C", 
-            "long_name": "Temperature", 
-            "standard_name": "sea_water_temperature"
-        }
-        ds['conductivity'].attrs = {
-            "units": "S/m", 
-            "long_name": "Conductivity", 
-            "standard_name": "sea_water_conductivity"
-        }
-        ds['pressure'].attrs = {
-            "units": "dbar", 
-            "long_name": "Pressure", 
-            "standard_name": "sea_water_pressure"
-        }
-
-        ds.attrs["Conventions"] = "CF-1.8"
-        ds.attrs["title"] = "RCM Data"
-        ds.attrs["source"] = "Recording Current Meter - Aanderaa"
-
-        for key in (list(ds.data_vars.keys()) + list(ds.coords.keys())):
-            super()._assign_metadata_for_key_to_xarray_dataset( ds, key)
+        
+        # Add minimal units from raw data (stages will enrich with CF metadata)
+        ds['u'].attrs = {'units': 'm/s'}
+        ds['v'].attrs = {'units': 'm/s'}
+        ds['temp'].attrs = {'units': '°C'}
+        ds['cond'].attrs = {'units': 'S/m'}
+        ds['pres'].attrs = {'units': 'dbar'}
+        
+        # Add source information
+        ds.attrs['source'] = 'Recording Current Meter - Aanderaa'
+        ds.attrs['instrument'] = 'RCM'
+        
         return ds
 
     def _load_data(self) -> xr.Dataset:
         """Load data from the MATLAB file and return an xarray Dataset."""
         data = self._parse_data(self.input_file)
         return self._create_xarray_dataset(data)
+
+    @classmethod
+    def format_mappings(cls) -> dict[str, list]:
+        """Return RCM-specific variable name mappings.
+        
+        Returns
+        -------
+        dict[str, list]
+            Dictionary mapping standard names to RCM format-specific aliases.
+        """
+        return {
+            params.EAST_VELOCITY: ['u'],
+            params.NORTH_VELOCITY: ['v'],
+            params.TEMPERATURE: ['temp'],
+            params.CONDUCTIVITY: ['cond'],
+            params.PRESSURE: ['pres'],
+            'vdir': ['vdir'],
+            'vmag': ['vmag'],
+        }
 
     @classmethod
     def format_key(cls) -> str:

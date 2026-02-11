@@ -240,9 +240,6 @@ class RbrRskLegacyReader(AbstractReader):
                 ds.attrs['rsk_version'] = db_info.get('version', '')
                 ds.attrs['rsk_type'] = db_info.get('type', '')
 
-            # Perform default post-processing
-            ds = self._perform_default_postprocessing(ds)
-
             return ds
         finally:
             # Always close the database connection, even if an error occurs

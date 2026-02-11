@@ -1,0 +1,25 @@
+{
+  "time": {
+    "standard_name": "time",
+    "long_name": "Time",
+    "axis": "T"
+  },
+  "depth": {
+    "standard_name": "depth",
+    "long_name": "Depth",
+    "axis": "Z",
+    "positive": "down"
+  },
+  "latitude": {
+    "standard_name": "latitude",
+    "long_name": "Latitude",
+    "axis": "Y",
+    "units": "degrees_north"
+  },
+  "longitude": {
+    "standard_name": "longitude",
+    "long_name": "Longitude",
+    "axis": "X",
+    "units": "degrees_east"
+  }
+}

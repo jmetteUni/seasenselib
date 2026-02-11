@@ -2,8 +2,11 @@
 Module for writing sensor data to CSV files.
 """
 
+import logging
 from seasenselib.writers.base import AbstractWriter
 import seasenselib.parameters as params
+
+logger = logging.getLogger(__name__)
 
 class CsvWriter(AbstractWriter):
     """ Writes sensor data from a xarray Dataset to a CSV file. 
@@ -52,7 +55,9 @@ class CsvWriter(AbstractWriter):
         df = data.to_dataframe()
 
         # Write the dataframe to the CSV file
+        logger.info("Writing CSV file to '%s'", file_name)
         df.to_csv(file_name, index=True)
+        logger.info("Wrote CSV file to '%s'", file_name)
 
     @staticmethod
     def file_extension() -> str:
