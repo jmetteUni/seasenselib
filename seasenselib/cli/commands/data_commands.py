@@ -227,7 +227,7 @@ def _write_processing_protocol(
     try:
         protocol["data_variables"] = list(dataset.data_vars)
         protocol["coordinates"] = list(dataset.coords)
-        protocol["dimensions"] = dict(dataset.dims)
+        protocol["dimensions"] = dict(dataset.sizes)
     except Exception:
         logger.debug("Failed to attach dataset structure to processing protocol", exc_info=True)
 

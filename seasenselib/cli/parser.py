@@ -77,7 +77,7 @@ class ArgumentParser:
         # Lazy load format lists when needed
         self._input_formats = None
         self._output_formats = None
-        self._default_profiles = ['default', 'minimal']
+        self._default_profiles = ['default', 'minimal', 'full']
 
     @property
     def INPUT_FORMATS(self):
