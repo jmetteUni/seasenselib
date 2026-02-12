@@ -626,6 +626,15 @@ class SbeCnvReader(AbstractReader):
         """
 
         _ensure_lazy_pylab()
+        try:
+            import pkg_resources  # noqa: F401
+        except Exception:
+            # pycnv still imports pkg_resources (deprecated) but does not use it.
+            # Provide a stub so imports succeed on environments without setuptools.
+            import sys
+            import types
+            sys.modules.setdefault("pkg_resources", types.ModuleType("pkg_resources"))
+            logger.debug("pkg_resources not available; using stub for pycnv import")
         import pycnv
         import os
 
