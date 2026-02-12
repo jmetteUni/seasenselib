@@ -629,11 +629,42 @@ class SbeCnvReader(AbstractReader):
         try:
             import pkg_resources  # noqa: F401
         except Exception:
-            # pycnv still imports pkg_resources (deprecated) but does not use it.
-            # Provide a stub so imports succeed on environments without setuptools.
+            # pycnv still imports pkg_resources (deprecated). Provide a minimal stub so
+            # imports succeed on environments without setuptools (e.g., Python 3.13).
             import sys
             import types
-            sys.modules.setdefault("pkg_resources", types.ModuleType("pkg_resources"))
+            from importlib import resources as _resources
+
+            def _as_package_name(pkg) -> str:
+                if isinstance(pkg, str):
+                    return pkg
+                for attr in ("project_name", "name", "key"):
+                    if hasattr(pkg, attr):
+                        return str(getattr(pkg, attr))
+                return str(pkg)
+
+            def _resource_path(pkg, resource: str) -> str:
+                pkg_name = _as_package_name(pkg)
+                if hasattr(_resources, "files"):
+                    return str(_resources.files(pkg_name).joinpath(resource))
+                with _resources.path(pkg_name, resource) as p:
+                    return str(p)
+
+            def _resource_filename(pkg, resource: str) -> str:
+                return _resource_path(pkg, resource)
+
+            def _resource_stream(pkg, resource: str):
+                return open(_resource_path(pkg, resource), "rb")
+
+            def _resource_string(pkg, resource: str) -> bytes:
+                with open(_resource_path(pkg, resource), "rb") as handle:
+                    return handle.read()
+
+            stub = types.ModuleType("pkg_resources")
+            stub.resource_filename = _resource_filename
+            stub.resource_stream = _resource_stream
+            stub.resource_string = _resource_string
+            sys.modules.setdefault("pkg_resources", stub)
             logger.debug("pkg_resources not available; using stub for pycnv import")
         import pycnv
         import os
