@@ -11,6 +11,7 @@ from ..core.exceptions import SeaSenseLibError
 from .parser import ArgumentParser
 from .commands import CommandFactory
 
+logger = logging.getLogger(__name__)
 
 class CLIRouter:
     """Main CLI router.
@@ -250,7 +251,7 @@ class CLIRouter:
                 from pathlib import Path
                 Path(log_path).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
             except Exception:
-                pass
+                logger.debug("Failed to create log directory for '%s'", log_path, exc_info=True)
 
         handlers = []
         if verbose:

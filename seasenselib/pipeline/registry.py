@@ -61,7 +61,13 @@ class StageRegistry:
             except ImportError:
                 from importlib_metadata import entry_points
 
-            discovered = entry_points(group='seasenselib.pipeline')
+            eps = entry_points()
+            if hasattr(eps, "select"):
+                discovered = eps.select(group='seasenselib.pipeline')
+            elif isinstance(eps, dict):
+                discovered = eps.get('seasenselib.pipeline', [])
+            else:
+                discovered = [ep for ep in eps if getattr(ep, "group", None) == 'seasenselib.pipeline']
 
             for ep in discovered:
                 try:

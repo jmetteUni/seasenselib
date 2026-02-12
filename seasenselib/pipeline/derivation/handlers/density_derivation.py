@@ -4,12 +4,11 @@ Density Derivation
 Calculates seawater density from temperature, salinity, and pressure using GSW.
 """
 
-from typing import List, Tuple, Dict, Any
+from typing import List, Tuple
 import xarray as xr
-import numpy as np
 from ...interfaces import IDerivation
 import seasenselib.parameters as params
-from .utils import pick_first_variant, output_name_from_input, units_ok
+from .utils import pick_first_variant, units_ok
 
 _GSW = None
 
@@ -69,7 +68,7 @@ class DensityDerivation(IDerivation):
         pres, _ = pick_first_variant(dataset, params.PRESSURE)
         return all([temp, sal, pres])
     
-    def derive(self, dataset: xr.Dataset) -> Tuple[Any, List[str]]:
+    def derive(self, dataset: xr.Dataset) -> Tuple[xr.DataArray, List[str]]:
         """
         Derive density from temperature, salinity, and pressure.
         

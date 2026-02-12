@@ -9,7 +9,6 @@ from __future__ import annotations
 from typing import Dict, List, Optional, Any
 import logging
 
-import xarray as xr
 import seasenselib.parameters as params
 
 from ...base import StageContext

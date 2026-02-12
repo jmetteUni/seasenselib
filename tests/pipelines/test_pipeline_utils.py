@@ -1,5 +1,3 @@
-import pytest
-
 from seasenselib.pipeline.config import PipelineConfig
 from seasenselib.pipeline.utils import parse_handler_selectors, apply_handler_filters
 

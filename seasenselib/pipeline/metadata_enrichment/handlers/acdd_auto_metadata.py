@@ -7,7 +7,7 @@ from __future__ import annotations
 from typing import List, Dict, Any, Optional, Tuple, Iterable
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import timezone
 
 import numpy as np
 import xarray as xr

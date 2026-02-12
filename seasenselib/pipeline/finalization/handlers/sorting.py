@@ -4,7 +4,6 @@ Sorting logic.
 Sorts variables and coordinates alphabetically for consistent output presentation.
 """
 
-import xarray as xr
 from ...base import StageContext
 
 

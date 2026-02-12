@@ -6,7 +6,6 @@ Calculates sound speed in seawater from temperature, salinity, and pressure usin
 
 from typing import List, Tuple, Any
 import xarray as xr
-import numpy as np
 from ...interfaces import IDerivation
 import seasenselib.parameters as params
 from .utils import pick_first_variant, units_ok

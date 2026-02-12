@@ -10,9 +10,6 @@ import seasenselib.parameters as params
 from .base import AbstractReader
 
 
-import seasenselib.parameters as params
-
-
 class NortekAsciiReader(AbstractReader):
     """ Reads Nortek ASCII data from a .dat file into a xarray Dataset. 
     

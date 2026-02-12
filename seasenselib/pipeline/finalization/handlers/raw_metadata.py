@@ -45,8 +45,6 @@ class RawMetadata:
         extracted_vars: Dict[str, Dict[str, Any]] = {}
 
         user_globals = set(metadata.get("user_metadata_global_keys", []) or [])
-        user_var_keys = metadata.get("user_metadata_variable_keys", {}) or {}
-
         protected_globals = set(self._protected_global_keys())
         protected_globals.update(user_globals)
 
@@ -169,7 +167,7 @@ class RawMetadata:
             if isinstance(raw_policy, dict):
                 keys.extend(raw_policy.get("preserve_global_attributes", []) or [])
         except Exception:
-            pass
+            logger.debug("Failed to load protected global keys from knowledge files", exc_info=True)
         return sorted(set(keys))
 
     @staticmethod
@@ -223,7 +221,8 @@ class RawMetadata:
             try:
                 return value.isoformat()
             except Exception:
-                pass
+                logger.debug("Failed to serialize isoformat value", exc_info=True)
+                return str(value)
         return str(value)
 
 

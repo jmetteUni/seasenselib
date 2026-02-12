@@ -173,7 +173,7 @@ class ACDDConvention(IConvention):
                     if 'time_coverage' in auto:
                         self.auto_time_coverage = bool(auto['time_coverage'])
         except Exception:
-            pass
+            logger.debug("Failed to load ACDD knowledge file", exc_info=True)
 
     def _acdd_attribute_names(self) -> List[str]:
         names = set(self.required_global_attributes) | set(self.recommended_global_attributes)

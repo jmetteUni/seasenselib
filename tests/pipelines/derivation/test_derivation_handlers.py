@@ -4,11 +4,6 @@ import xarray as xr
 
 from seasenselib.pipeline.base import StageContext
 from seasenselib.pipeline.interfaces import IDerivation
-from seasenselib.pipeline.derivation.handlers.density_derivation import DensityDerivation
-from seasenselib.pipeline.derivation.handlers.potential_temperature_derivation import PotentialTemperatureDerivation
-from seasenselib.pipeline.derivation.handlers.conservative_temperature_derivation import ConservativeTemperatureDerivation
-from seasenselib.pipeline.derivation.handlers.sound_speed_derivation import SoundSpeedDerivation
-from seasenselib.pipeline.derivation.handlers.depth_derivation import DepthDerivation
 from seasenselib.pipeline.derivation.handlers.derivation_runner import DerivationRunner
 
 import seasenselib.pipeline.derivation.handlers.density_derivation as density_mod
@@ -34,13 +29,13 @@ def _base_dataset():
 
 def test_density_derivation_missing_inputs():
     ds = xr.Dataset({"temperature": (["time"], [1.0, 2.0])})
-    derivation = DensityDerivation()
+    derivation = density_mod.DensityDerivation()
     assert derivation.can_derive(ds) is False
 
 
 def test_density_derivation_import_error(monkeypatch):
     ds = _base_dataset()
-    derivation = DensityDerivation()
+    derivation = density_mod.DensityDerivation()
     monkeypatch.setattr(density_mod, "_get_gsw", lambda: None)
     assert derivation.can_derive(ds) is False
     with pytest.raises(ImportError):
@@ -51,7 +46,7 @@ def test_density_derivation_positive_if_gsw_available():
     if density_mod._get_gsw() is None:
         pytest.skip("GSW not available")
     ds = _base_dataset()
-    derivation = DensityDerivation()
+    derivation = density_mod.DensityDerivation()
     result, warnings = derivation.derive(ds)
     assert warnings == []
     assert result.dims == ds["temperature"].dims
@@ -60,13 +55,13 @@ def test_density_derivation_positive_if_gsw_available():
 
 def test_potential_temperature_derivation_negative_missing_inputs():
     ds = xr.Dataset({"temperature": (["time"], [1.0, 2.0])})
-    derivation = PotentialTemperatureDerivation()
+    derivation = pt_mod.PotentialTemperatureDerivation()
     assert derivation.can_derive(ds) is False
 
 
 def test_potential_temperature_derivation_import_error(monkeypatch):
     ds = _base_dataset()
-    derivation = PotentialTemperatureDerivation()
+    derivation = pt_mod.PotentialTemperatureDerivation()
     monkeypatch.setattr(pt_mod, "_get_gsw", lambda: None)
     assert derivation.can_derive(ds) is False
     with pytest.raises(ImportError):
@@ -77,7 +72,7 @@ def test_potential_temperature_derivation_positive_if_gsw_available():
     if pt_mod._get_gsw() is None:
         pytest.skip("GSW not available")
     ds = _base_dataset()
-    derivation = PotentialTemperatureDerivation()
+    derivation = pt_mod.PotentialTemperatureDerivation()
     outputs, warnings = derivation.derive(ds)
     assert warnings == []
     assert "potential_temperature" in outputs
@@ -88,7 +83,7 @@ def test_potential_temperature_derivation_positive_if_gsw_available():
 
 def test_conservative_temperature_derivation_requires_lat_lon():
     ds = _base_dataset()
-    derivation = ConservativeTemperatureDerivation()
+    derivation = ct_mod.ConservativeTemperatureDerivation()
     outputs, warnings = derivation.derive(ds)
     assert outputs == {}
     assert any("latitude/longitude" in w for w in warnings)
@@ -100,7 +95,7 @@ def test_conservative_temperature_derivation_positive_if_gsw_available():
     ds = _base_dataset()
     ds.attrs["latitude"] = 54.0
     ds.attrs["longitude"] = 10.0
-    derivation = ConservativeTemperatureDerivation()
+    derivation = ct_mod.ConservativeTemperatureDerivation()
     outputs, warnings = derivation.derive(ds)
     assert warnings == []
     assert "conservative_temperature" in outputs
@@ -111,13 +106,13 @@ def test_conservative_temperature_derivation_positive_if_gsw_available():
 
 def test_sound_speed_derivation_negative_missing_inputs():
     ds = xr.Dataset({"salinity": (["time"], [1.0, 2.0])})
-    derivation = SoundSpeedDerivation()
+    derivation = ss_mod.SoundSpeedDerivation()
     assert derivation.can_derive(ds) is False
 
 
 def test_sound_speed_derivation_import_error(monkeypatch):
     ds = _base_dataset()
-    derivation = SoundSpeedDerivation()
+    derivation = ss_mod.SoundSpeedDerivation()
     monkeypatch.setattr(ss_mod, "_get_gsw", lambda: None)
     assert derivation.can_derive(ds) is False
     with pytest.raises(ImportError):
@@ -128,7 +123,7 @@ def test_sound_speed_derivation_positive_if_gsw_available():
     if ss_mod._get_gsw() is None:
         pytest.skip("GSW not available")
     ds = _base_dataset()
-    derivation = SoundSpeedDerivation()
+    derivation = ss_mod.SoundSpeedDerivation()
     result, warnings = derivation.derive(ds)
     assert warnings == []
     assert result.dims == ds["temperature"].dims
@@ -137,14 +132,14 @@ def test_sound_speed_derivation_positive_if_gsw_available():
 
 def test_depth_derivation_requires_pressure_units():
     ds = xr.Dataset({"pressure": (["time"], [1.0, 2.0])})
-    derivation = DepthDerivation()
+    derivation = depth_mod.DepthDerivation()
     assert derivation.can_derive(ds) is False
 
 
 def test_depth_derivation_default_latitude_behavior(monkeypatch):
     ds = xr.Dataset({"pressure": (["time"], [10.0, 12.0])})
     ds["pressure"].attrs["units"] = "dbar"
-    derivation = DepthDerivation(use_default_latitude=True, default_latitude=45.0)
+    derivation = depth_mod.DepthDerivation(use_default_latitude=True, default_latitude=45.0)
 
     if depth_mod._get_gsw() is None:
         pytest.skip("GSW not available")
@@ -160,13 +155,13 @@ def test_depth_derivation_default_latitude_behavior(monkeypatch):
 def test_depth_derivation_missing_latitude_no_default():
     ds = xr.Dataset({"pressure": (["time"], [10.0, 12.0])})
     ds["pressure"].attrs["units"] = "dbar"
-    derivation = DepthDerivation(use_default_latitude=False)
+    derivation = depth_mod.DepthDerivation(use_default_latitude=False)
     assert derivation.can_derive(ds) is False
 
 
 def test_depth_derivation_import_error(monkeypatch):
     ds = _base_dataset()
-    derivation = DepthDerivation(use_default_latitude=True)
+    derivation = depth_mod.DepthDerivation(use_default_latitude=True)
     monkeypatch.setattr(depth_mod, "_get_gsw", lambda: None)
     assert derivation.can_derive(ds) is False
     with pytest.raises(ImportError):

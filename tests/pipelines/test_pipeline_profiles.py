@@ -1,5 +1,3 @@
-import pytest
-
 from seasenselib.pipeline.config import PipelineConfig
 
 

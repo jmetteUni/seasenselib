@@ -4,7 +4,6 @@ Metadata extraction runner.
 Composite extractor that combines multiple metadata extractors.
 """
 
-import xarray as xr
 from typing import List
 import logging
 from ...base import StageContext

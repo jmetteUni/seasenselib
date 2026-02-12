@@ -9,9 +9,6 @@ import seasenselib.parameters as params
 from .base import AbstractReader
 
 
-import seasenselib.parameters as params
-
-
 class RbrRskReader(AbstractReader):
     """
     Reads sensor data from a RBR .rsk file into a xarray Dataset.

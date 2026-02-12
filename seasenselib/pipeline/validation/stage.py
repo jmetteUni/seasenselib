@@ -6,7 +6,7 @@ Runs validators and records results in context metadata.
 
 from __future__ import annotations
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any
 
 from ..base import Stage, StageContext
 from .handlers.validation_runner import ValidationRunner

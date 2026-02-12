@@ -41,6 +41,10 @@ def test_unit_validator_reports_missing_and_deprecated():
 
     ds["temperature"].attrs["units"] = "degC"
     issues = validator.validate(ds)
+    assert not any(i.severity == "info" for i in issues)
+
+    ds["temperature"].attrs["units"] = "deg C"
+    issues = validator.validate(ds)
     assert any(i.severity == "info" for i in issues)
 
 

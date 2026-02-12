@@ -7,6 +7,7 @@ Applies CF, optional ACDD, and user metadata overrides.
 from __future__ import annotations
 
 from typing import Dict, Any
+import logging
 
 from ..base import Stage, StageContext
 from .handlers.cf_convention import CFConvention
@@ -17,6 +18,7 @@ from .handlers.whp_parameters import WHPParameters
 from ..handler_registry import HandlerRegistry, HANDLER_GROUP_CONVENTIONS
 from ..interfaces import IConvention
 
+logger = logging.getLogger(__name__)
 
 class MetadataEnrichmentStage(Stage):
     """Stage 5: Metadata enrichment and standardization."""
@@ -64,6 +66,7 @@ class MetadataEnrichmentStage(Stage):
                     try:
                         conventions.append((name, cls()))
                     except Exception:
+                        logger.debug("Failed to instantiate convention '%s'", name, exc_info=True)
                         continue
             self._conventions = conventions
             self._handler_order = [name for name, _ in conventions]
@@ -86,7 +89,7 @@ class MetadataEnrichmentStage(Stage):
                 from pathlib import Path
                 ds.attrs["raw_filename"] = Path(str(context.metadata["source_file"])).name
             except Exception:
-                pass
+                logger.debug("Failed to derive raw_filename from source_file", exc_info=True)
         if not ds.attrs.get("source_format_name") and context.metadata.get("format_name"):
             ds.attrs["source_format_name"] = context.metadata["format_name"]
 

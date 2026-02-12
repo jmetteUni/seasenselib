@@ -4,8 +4,6 @@ Tests for the pipeline executor.
 
 import pytest
 import xarray as xr
-import numpy as np
-
 from seasenselib.pipeline.base import Stage, StageContext
 from seasenselib.pipeline.pipeline import Pipeline
 

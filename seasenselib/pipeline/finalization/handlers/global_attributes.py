@@ -10,8 +10,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 import logging
 
-import xarray as xr
-
 from ...base import StageContext
 
 logger = logging.getLogger(__name__)

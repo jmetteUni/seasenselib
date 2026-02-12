@@ -235,7 +235,6 @@ class ListCommand(BaseCommand):
         """List available pipeline profiles."""
         try:
             from importlib import resources
-            import json
             profiles = []
             root = resources.files('seasenselib.config.pipeline')
             for item in root.iterdir():

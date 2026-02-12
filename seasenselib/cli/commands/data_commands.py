@@ -4,11 +4,13 @@ Data processing commands (convert, show, subset, calc).
 
 import argparse
 import json
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from ...core.exceptions import ValidationError
 from .base import BaseCommand, CommandResult
 
+logger = logging.getLogger(__name__)
 
 def _build_stage_kwargs(args):
     """Build processing stage kwargs from CLI arguments.
@@ -106,7 +108,7 @@ def _build_stage_kwargs(args):
             stage_kwargs['pipeline_config'] = config
         except Exception:
             # If registry fails, just pass the skip info and let read() handle it
-            pass
+            logger.debug("Failed to resolve pipeline stages for --pipeline-skip-stages", exc_info=True)
 
     # Apply handler filters if provided
     apply_handlers = getattr(args, 'pipeline_apply_handlers', None)
@@ -227,7 +229,7 @@ def _write_processing_protocol(
         protocol["coordinates"] = list(dataset.coords)
         protocol["dimensions"] = dict(dataset.dims)
     except Exception:
-        pass
+        logger.debug("Failed to attach dataset structure to processing protocol", exc_info=True)
 
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as f:

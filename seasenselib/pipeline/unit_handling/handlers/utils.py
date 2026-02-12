@@ -7,10 +7,12 @@ Shared helpers for unit normalization/conversion/validation.
 from __future__ import annotations
 
 from typing import Dict
+import logging
 import re
 
 import seasenselib.parameters as params
 
+logger = logging.getLogger(__name__)
 
 def _base_name(name: str) -> str:
     match = re.match(r"^([a-zA-Z0-9_]+?)(?:_\d{1,2})?$", name)
@@ -25,7 +27,7 @@ def get_expected_units() -> Dict[str, str]:
         if isinstance(data, dict) and data:
             return data
     except Exception:
-        pass
+        logger.debug("Failed to load expected units from knowledge file", exc_info=True)
 
     expected: Dict[str, str] = {}
     for param_name, meta in params.metadata.items():
@@ -54,7 +56,7 @@ def get_unit_aliases() -> Dict[str, str]:
         if isinstance(data, dict):
             return data
     except Exception:
-        pass
+        logger.debug("Failed to load unit aliases from knowledge file", exc_info=True)
     return {}
 
 

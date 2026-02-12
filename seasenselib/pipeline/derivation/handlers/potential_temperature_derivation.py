@@ -6,7 +6,6 @@ Calculates potential temperature from in-situ temperature, salinity, and pressur
 
 from typing import List, Dict, Tuple
 import xarray as xr
-import numpy as np
 from ...interfaces import IDerivation
 import seasenselib.parameters as params
 from .utils import list_variants, output_name_from_input, units_ok

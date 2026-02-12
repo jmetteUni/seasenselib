@@ -4,8 +4,6 @@ Tests for the stage system base classes.
 
 import pytest
 import xarray as xr
-import numpy as np
-
 from seasenselib.pipeline import Stage, StageContext, Pipeline
 
 

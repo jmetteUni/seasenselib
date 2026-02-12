@@ -43,9 +43,9 @@ class UnitValidator(IValidator):
             units = var.attrs['units']
             
             # Check for deprecated units
-            if units in ['degrees C', 'deg C', 'degC']:
+            if units in ['degrees C', 'deg C']:
                 errors.append(ValidationError(
-                    f"Non-standard temperature unit '{units}'. Use 'ITS-90, deg C'",
+                    f"Non-standard temperature unit '{units}'. Use 'degC'",
                     severity="info",
                     path=var_name
                 ))

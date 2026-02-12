@@ -222,7 +222,7 @@ class CFConvention(IConvention):
             if isinstance(data, dict):
                 return data
         except Exception:
-            pass
+            logger.debug("Failed to load CF coordinate defaults", exc_info=True)
         return {}
 
 

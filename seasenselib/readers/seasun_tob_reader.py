@@ -173,7 +173,7 @@ class SeasunTobReader(AbstractReader):
             params.CONDUCTIVITY: ['Cond'],
             params.PRESSURE: ['Press'],
             params.SPEED_OF_SOUND: ['SOUND'],
-            'power_supply_input_voltage': ['Vbatt'],
+            params.POWER_SUPPLY_INPUT_VOLTAGE: ['Vbatt'],
             'sigma': ['SIGMA'],
             'sample': ['Datasets'],
         }

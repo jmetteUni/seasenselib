@@ -9,10 +9,8 @@ from __future__ import annotations
 from typing import List, Optional, Dict, Any
 import logging
 
-import xarray as xr
-
 from ...base import StageContext
-from ...interfaces import IValidator, ValidationError
+from ...interfaces import IValidator
 from .cf_validator import CFValidator
 from .unit_validator import UnitValidator
 
@@ -38,8 +36,8 @@ class ValidationRunner:
         for validator in self.validators:
             try:
                 issues = validator.validate(ds)
-            except Exception as e:
-                logger.warning(f"Validator '{validator.name()}' failed: {e}")
+            except Exception:
+                logger.exception("Validator '%s' failed", validator.name())
                 continue
 
             for issue in issues:

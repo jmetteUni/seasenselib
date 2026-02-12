@@ -3,7 +3,6 @@ import pytest
 import xarray as xr
 
 from seasenselib.pipeline.unit_handling.handlers.unit_normalizer import UnitNormalizer
-from seasenselib.pipeline.unit_handling.handlers.unit_converter import UnitConverter
 import seasenselib.pipeline.unit_handling.handlers.unit_converter as converter_mod
 
 
@@ -35,7 +34,7 @@ def test_unit_normalizer_missing_units_non_strict():
 
 def test_unit_converter_no_units_no_conversion():
     ds = xr.Dataset({"temperature": (["time"], [10.0, 11.0])})
-    converter = UnitConverter(expected_units={"temperature": "K"})
+    converter = converter_mod.UnitConverter(expected_units={"temperature": "K"})
     result, conversions = converter.convert(ds)
     assert result is ds
     assert conversions == []
@@ -47,7 +46,7 @@ def test_unit_converter_with_pint_if_available():
 
     ds = xr.Dataset({"temperature": (["time"], np.array([0.0, 10.0]))})
     ds["temperature"].attrs["units"] = "degC"
-    converter = UnitConverter(
+    converter = converter_mod.UnitConverter(
         expected_units={"temperature": "K"},
         conversion_mode="duplicate_keep_original",
         original_suffix="_orig",
