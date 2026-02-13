@@ -45,6 +45,7 @@ BUILTIN_HANDLERS: Dict[str, Dict[str, str]] = {
         "depth": "seasenselib.pipeline.derivation.handlers.depth_derivation.DepthDerivation",
         "potential_temperature": "seasenselib.pipeline.derivation.handlers.potential_temperature_derivation.PotentialTemperatureDerivation",
         "conservative_temperature": "seasenselib.pipeline.derivation.handlers.conservative_temperature_derivation.ConservativeTemperatureDerivation",
+        "absolute_salinity": "seasenselib.pipeline.derivation.handlers.absolute_salinity_derivation.AbsoluteSalinityDerivation",
         "sound_speed": "seasenselib.pipeline.derivation.handlers.sound_speed_derivation.SoundSpeedDerivation",
     },
     "metadata_extraction": {

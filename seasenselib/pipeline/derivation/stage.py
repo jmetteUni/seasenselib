@@ -41,6 +41,7 @@ class DerivationStage(Stage):
         from .handlers.depth_derivation import DepthDerivation
         from .handlers.potential_temperature_derivation import PotentialTemperatureDerivation
         from .handlers.conservative_temperature_derivation import ConservativeTemperatureDerivation
+        from .handlers.absolute_salinity_derivation import AbsoluteSalinityDerivation
         from .handlers.sound_speed_derivation import SoundSpeedDerivation
 
         mapping = {
@@ -48,6 +49,7 @@ class DerivationStage(Stage):
             'depth': DepthDerivation,
             'potential_temperature': PotentialTemperatureDerivation,
             'conservative_temperature': ConservativeTemperatureDerivation,
+            'absolute_salinity': AbsoluteSalinityDerivation,
             'sound_speed': SoundSpeedDerivation,
         }
         if any(name not in mapping for name in handlers):

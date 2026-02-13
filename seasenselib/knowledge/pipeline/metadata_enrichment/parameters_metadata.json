@@ -97,6 +97,12 @@
     "standard_name": "sea_water_conservative_temperature",
     "units": "degC"
   },
+  "absolute_salinity": {
+    "long_name": "Absolute Salinity",
+    "measurement_type": "Derived",
+    "standard_name": "sea_water_absolute_salinity",
+    "units": "g kg-1"
+  },
   "power_supply_input": {
     "long_name": "Power supply input voltage",
     "units": "V"

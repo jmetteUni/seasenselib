@@ -28,6 +28,7 @@
           "depth",
           "potential_temperature",
           "conservative_temperature",
+          "absolute_salinity",
           "sound_speed"
         ]
       }

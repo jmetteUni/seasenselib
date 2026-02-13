@@ -13,6 +13,7 @@ LONGITUDE = 'longitude'
 DENSITY = 'density'
 POTENTIAL_TEMPERATURE = 'potential_temperature'
 CONSERVATIVE_TEMPERATURE = 'conservative_temperature'
+ABSOLUTE_SALINITY = 'absolute_salinity'
 SPEED_OF_SOUND = 'speed_of_sound'
 TIME_J = 'timeJ'  # Julian days offset
 TIME_Q = 'timeQ'  # Seconds since January 1, 2000
@@ -107,6 +108,12 @@ metadata = {
         'long_name': 'Conservative Temperature',
         'units': 'degC',
         'standard_name': 'sea_water_conservative_temperature',
+        'measurement_type': 'Derived',
+    },
+    ABSOLUTE_SALINITY: {
+        'long_name': 'Absolute Salinity',
+        'units': 'g kg-1',
+        'standard_name': 'sea_water_absolute_salinity',
         'measurement_type': 'Derived',
     },
     SPEED_OF_SOUND: {

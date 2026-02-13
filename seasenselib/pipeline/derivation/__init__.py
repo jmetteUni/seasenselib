@@ -18,6 +18,7 @@ from .handlers.density_derivation import DensityDerivation
 from .handlers.depth_derivation import DepthDerivation
 from .handlers.potential_temperature_derivation import PotentialTemperatureDerivation
 from .handlers.conservative_temperature_derivation import ConservativeTemperatureDerivation
+from .handlers.absolute_salinity_derivation import AbsoluteSalinityDerivation
 from .handlers.sound_speed_derivation import SoundSpeedDerivation
 from .handlers.derivation_runner import DerivationRunner
 from .stage import DerivationStage
@@ -27,6 +28,7 @@ __all__ = [
     'DepthDerivation',
     'PotentialTemperatureDerivation',
     'ConservativeTemperatureDerivation',
+    'AbsoluteSalinityDerivation',
     'SoundSpeedDerivation',
     'DerivationRunner',
     'DerivationStage',

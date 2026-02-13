@@ -8,6 +8,7 @@ from .density_derivation import DensityDerivation
 from .depth_derivation import DepthDerivation
 from .potential_temperature_derivation import PotentialTemperatureDerivation
 from .conservative_temperature_derivation import ConservativeTemperatureDerivation
+from .absolute_salinity_derivation import AbsoluteSalinityDerivation
 from .sound_speed_derivation import SoundSpeedDerivation
 from .derivation_runner import DerivationRunner
 
@@ -16,6 +17,7 @@ __all__ = [
     "DepthDerivation",
     "PotentialTemperatureDerivation",
     "ConservativeTemperatureDerivation",
+    "AbsoluteSalinityDerivation",
     "SoundSpeedDerivation",
     "DerivationRunner",
 ]

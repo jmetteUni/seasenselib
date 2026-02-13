@@ -37,6 +37,15 @@
     "derivation_function": "gsw.CT_from_t",
     "reference": "IOC, SCOR and IAPSO, 2010: The international thermodynamic equation of seawater – 2010"
   },
+  "absolute_salinity": {
+    "standard_name": "sea_water_absolute_salinity",
+    "long_name": "Absolute Salinity",
+    "units": "g kg-1",
+    "comment": "Calculated using GSW TEOS-10 library from practical salinity, pressure, and geographic coordinates",
+    "derivation_method": "TEOS-10 GSW",
+    "derivation_function": "gsw.SA_from_SP",
+    "reference": "IOC, SCOR and IAPSO, 2010: The international thermodynamic equation of seawater – 2010"
+  },
   "sound_speed": {
     "standard_name": "speed_of_sound_in_sea_water",
     "long_name": "Speed of Sound in Sea Water",

@@ -4,6 +4,7 @@
   "chlorophyll": "Chlorophyll",
   "conductivity": "Conductivity (S m-1)",
   "conservative_temperature": "Conservative Temperature (degC)",
+  "absolute_salinity": "Absolute Salinity (g kg-1)",
   "correlation": "Correlation (unitless)",
   "density": "Density (kg m-3)",
   "depth": "Depth (meters)",
