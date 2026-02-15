@@ -5,6 +5,7 @@
   "degree_C": "degC",
   "ITS-90, deg C": "degC",
   "degree_Celsius": "degC",
+  "degrees C": "degC",
   "dbar": "dbar",
   "decibar": "dbar",
   "PSU": "1",
@@ -20,5 +21,11 @@
   "deg": "degrees",
   "degree": "degrees",
   "V": "volts",
-  "volt": "volts"
+  "volt": "volts",
+  "Sverdrup/m": "Sv/m",
+  "PetaWatts": "PW",
+  "petawatts": "PW",
+  "kg/m³": "kg m-3",
+  "kg/m3": "kg m-3",
+  "kg m^-3": "kg m-3"
 }

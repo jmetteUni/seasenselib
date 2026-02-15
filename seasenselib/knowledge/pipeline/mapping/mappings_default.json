@@ -5,8 +5,14 @@
     "CTDALTIMETER",
     "ctd_altimeter"
   ],
+  "battery_voltage": [
+    "Vbatt",
+    "BATTV",
+    "battery voltage"
+  ],
   "chlorophyll": [
-    "Chlorophyll"
+    "Chlorophyll",
+    "CLCON"
   ],
   "conductivity": [
     "c0mS/cm",
@@ -17,6 +23,7 @@
     "cond1mS/cm",
     "c1",
     "c1S/m",
+    "CON",
     "COND",
     "Conductivity",
     "cond0",
@@ -192,7 +199,8 @@
     "CTDTMP",
     "ctd_temperature",
     "ctd_temperature_68",
-    "sea_water_temperature"
+    "sea_water_temperature",
+    "OTMP" 
   ],
   "timeJ": [
     "timeJ",
@@ -213,7 +221,8 @@
     "turbWETntu0",
     "Turbidity",
     "Backscatter",
-    "sea_water_turbidity"
+    "sea_water_turbidity",
+    "TURB"
   ],
   "up_amplitude": [
     "Amplitude (Beam3)",
@@ -226,5 +235,10 @@
     "Velocity (Beam3|Z|Up)",
     "Upward velocity",
     "upward_sea_water_velocity"
+  ],
+  "redox_potential": [
+    "EH",
+    "redox",
+    "Redox potential"
   ]
 }

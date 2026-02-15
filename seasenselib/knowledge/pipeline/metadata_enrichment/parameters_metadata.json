@@ -149,7 +149,7 @@
     "coverage_content_type": "physicalMeasurement",
     "long_name": "Turbidity",
     "measurement_type": "Measured",
-    "short_name": "Tur",
+    "short_name": "TURB",
     "standard_name": "sea_water_turbidity"
   },
   "up_velocity": {
