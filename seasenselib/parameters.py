@@ -38,6 +38,7 @@ ROLL = 'roll'
 HEADING = 'heading'
 BATTERY_VOLTAGE = 'battery_voltage'
 ALTIMETER = 'altimeter'
+REDOX_POTENTIAL = 'redox_potential'
 
 # Meta data should use standardized values from https://cfconventions.org/
 metadata = {

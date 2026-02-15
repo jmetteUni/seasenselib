@@ -24,6 +24,7 @@
   "potential_temperature": "Potential Temperature \u03b8 (degC)",
   "power_supply_input": "Power supply input voltage (V)",
   "pressure": "Pressure (dbar)",
+  "redox_potential": "Redox potential (mV)",
   "roll": "Roll angle (degrees)",
   "salinity": "Salinity",
   "speed_of_sound": "Speed of sound in sea water (m/s)",
