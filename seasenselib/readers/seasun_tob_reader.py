@@ -141,32 +141,42 @@ class SeasunTobReader(AbstractReader):
             if name in ds and units[index]:
                 ds[name].attrs['units'] = units[index]
 
-        # Rename fields
-        ds = ds.rename({
-            'SALIN': params.SALINITY,
-            'Temp': params.TEMPERATURE,
-            'Cond': params.CONDUCTIVITY,
-            'Press': params.PRESSURE,
-            'SOUND': params.SPEED_OF_SOUND,
-            'Vbatt': params.POWER_SUPPLY_INPUT_VOLTAGE,
-            'SIGMA': 'sigma',
-            'Datasets': 'sample',
-        })
-
-        # Convert pressure to depth
-        pressure_in_dbar = ds['pressure'].values  # Extract pressure values from the dataset
-        depth_in_meters = gsw.z_from_p(pressure_in_dbar, lat=53.8187)  # TODO latitude is for Cuxhaven
-        ds['depth'] = (('time',), depth_in_meters)  # Assuming the pressure varies with time
-        ds['depth'].attrs['units'] = "m"
+        # Convert pressure to depth if available
+        if 'Press' in ds:
+            pressure_in_dbar = ds['Press'].values
+            depth_in_meters = gsw.z_from_p(pressure_in_dbar, lat=53.8187)  # TODO latitude is for Cuxhaven
+            ds['depth'] = (('time',), depth_in_meters)
+            ds['depth'].attrs['units'] = "m"
 
         # Ensure 'time' coordinate is datetime type
-        ds[params.TIME] = pd.to_datetime(ds[params.TIME], errors='coerce')
+        if params.TIME in ds.coords:
+            ds[params.TIME] = pd.to_datetime(ds[params.TIME], errors='coerce')
 
         # Assign meta information for all attributes of the xarray Dataset
         for key in (list(ds.data_vars.keys()) + list(ds.coords.keys())):
             super()._assign_metadata_for_key_to_xarray_dataset( ds, key)
 
         return ds
+
+    @classmethod
+    def format_mappings(cls) -> dict[str, list]:
+        """Return Sea & Sun TOB format-specific variable name mappings.
+        
+        Returns
+        -------
+        dict[str, list]
+            Dictionary mapping standard names to TOB format-specific aliases.
+        """
+        return {
+            params.SALINITY: ['SALIN'],
+            params.TEMPERATURE: ['Temp'],
+            params.CONDUCTIVITY: ['Cond'],
+            params.PRESSURE: ['Press'],
+            params.SPEED_OF_SOUND: ['SOUND'],
+            params.POWER_SUPPLY_INPUT_VOLTAGE: ['Vbatt'],
+            'sigma': ['SIGMA'],
+            'sample': ['Datasets'],
+        }
 
     @classmethod
     def format_key(cls) -> str:

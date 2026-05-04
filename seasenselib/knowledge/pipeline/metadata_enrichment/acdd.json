@@ -1,0 +1,47 @@
+{
+  "version": "1.3",
+  "required_global_attributes": [],
+  "recommended_global_attributes": [
+    "title",
+    "summary",
+    "keywords",
+    "Conventions",
+    "id",
+    "naming_authority",
+    "history",
+    "source",
+    "processing_level",
+    "comment",
+    "acknowledgment",
+    "license",
+    "standard_name_vocabulary",
+    "date_created",
+    "creator_name",
+    "creator_email",
+    "creator_url",
+    "institution",
+    "project",
+    "publisher_name",
+    "publisher_email",
+    "publisher_url",
+    "geospatial_lat_min",
+    "geospatial_lat_max",
+    "geospatial_lon_min",
+    "geospatial_lon_max",
+    "geospatial_vertical_min",
+    "geospatial_vertical_max",
+    "geospatial_vertical_positive",
+    "time_coverage_start",
+    "time_coverage_end",
+    "time_coverage_duration",
+    "time_coverage_resolution"
+  ],
+  "defaults": {
+    "standard_name_vocabulary": "CF-1.13",
+    "processing_level": "L1"
+  },
+  "auto_fill": {
+    "geospatial": true,
+    "time_coverage": true
+  }
+}

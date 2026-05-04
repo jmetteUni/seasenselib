@@ -1,0 +1,14 @@
+{
+  "temperature": [
+    "degc",
+    "degree_celsius"
+  ],
+  "salinity": [
+    "1",
+    "dimensionless"
+  ],
+  "pressure": [
+    "dbar",
+    "db"
+  ]
+}

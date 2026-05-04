@@ -1,0 +1,22 @@
+{
+  "stages": [
+    {
+      "name": "mapping"
+    },
+    {
+      "name": "finalization",
+      "config": {
+        "handlers": [
+          "raw_metadata",
+          "processor_metadata",
+          "global_attributes",
+          "sorting"
+        ]
+      }
+    }
+  ],
+  "global": {
+    "profile": "minimal",
+    "description": "Minimal pipeline - variable mapping + finalization only."
+  }
+}

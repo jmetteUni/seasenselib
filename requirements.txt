@@ -7,5 +7,6 @@ scipy
 pylablib
 matplotlib
 netcdf4
+pint
 pyrsktools
 setuptools

@@ -279,11 +279,10 @@ class AdcpMatlabUhhdsReader(AbstractReader):
         return data_vars, coords
     
     def _add_metadata(self):
-        # Add common metadata attributes
+        # Add minimal source metadata (CF compliance handled by stages)
         self.dataset.attrs.update({
-            "Conventions": "CF-1.8",
-            "title": "ADCP Data",
             "source": "Acoustic Doppler Current Profiler",
+            "instrument": "ADCP",
         })
 
     @classmethod

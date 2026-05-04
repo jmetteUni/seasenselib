@@ -12,7 +12,6 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 import warnings
 import xarray as xr
-import matplotlib.pyplot as plt
 import seasenselib.parameters as params
 
 
@@ -149,6 +148,7 @@ class AbstractPlotter(ABC):
         exc_tb : TracebackType
             Traceback if an exception was raised.
         """
+        plt = self._get_plt()
         plt.close('all')  # Close all matplotlib figures
         self._data = None
 
@@ -274,7 +274,14 @@ class AbstractPlotter(ABC):
         output_file : str, optional
             Path to save the plot. If None, the plot is displayed.
         """
+        plt = self._get_plt()
         if output_file:
             plt.savefig(output_file)
         else:
             plt.show()
+
+    @staticmethod
+    def _get_plt():
+        """Lazy import for matplotlib.pyplot to avoid heavy import at module load."""
+        import matplotlib.pyplot as plt
+        return plt

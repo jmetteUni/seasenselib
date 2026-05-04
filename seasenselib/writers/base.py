@@ -8,8 +8,11 @@ writing data to various formats (e.g., NetCDF, CSV, Excel).
 """
 
 from abc import ABC, abstractmethod
+import logging
 import warnings
 import xarray as xr
+
+logger = logging.getLogger(__name__)
 
 
 class AbstractWriter(ABC):
@@ -74,6 +77,7 @@ class AbstractWriter(ABC):
 
         self._data = data
         self._initialized = True  # Flag to control setter behavior
+        logger.info("Initialized writer %s", self.__class__.__name__)
 
     @staticmethod
     @abstractmethod
@@ -190,6 +194,7 @@ class AbstractWriter(ABC):
         >>> with SomeWriter(dataset) as writer:
         ...     writer.write('output.nc')
         """
+        logger.debug("Entering writer context for %s", self.__class__.__name__)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
@@ -205,6 +210,7 @@ class AbstractWriter(ABC):
             Traceback if an exception was raised.
         """
         self._data = None
+        logger.debug("Exiting writer context for %s", self.__class__.__name__)
 
     def __repr__(self) -> str:
         """String representation of the writer.

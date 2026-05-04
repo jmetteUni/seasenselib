@@ -5,15 +5,25 @@ This module provides simple programmatic access to SeaSenseLib functionality
 without requiring knowledge of the internal CLI structure.
 """
 
-from typing import List, Dict, Optional, TYPE_CHECKING
+from typing import List, Dict, Optional, TYPE_CHECKING, Any
 from .core import DataIOManager
 
 if TYPE_CHECKING:
     import xarray as xr
 
 
-def read(filename: str, file_format: Optional[str] = None, 
-         header_file: Optional[str] = None, **kwargs) -> 'xr.Dataset':
+def read(filename: str, file_format: Optional[str] = None,
+         header_file: Optional[str] = None, use_steps: bool = True,
+         pipeline_apply_stages: Optional[List[str]] = None,
+         pipeline_skip_stages: Optional[List[str]] = None,
+         pipeline_profile: Optional[str] = None,
+         pipeline_file: Optional[str] = None,
+         pipeline_apply_handlers: Optional[List[str]] = None,
+         pipeline_skip_handlers: Optional[List[str]] = None,
+         metadata: Optional[Dict[str, Any]] = None,
+         metadata_file: Optional[str] = None,
+         step_config: Optional[Dict[str, Any]] = None,
+         **kwargs) -> 'xr.Dataset':
     """
     Read a sensor data file and return it as an xarray Dataset.
     
@@ -32,6 +42,31 @@ def read(filename: str, file_format: Optional[str] = None,
         If None, format will be auto-detected from file extension.
     header_file : str, optional
         Path to header file (required for Nortek ASCII files)
+    use_steps : bool, default=True
+        Whether to use the processing step pipeline system.
+        If False, returns raw data without any processing.
+    pipeline_apply_stages : List[str], optional
+        Explicit list of pipeline stage names to apply. If None, uses default pipeline.
+        Example: ['mapping', 'metadata_enrichment']
+    pipeline_skip_stages : List[str], optional
+        Pipeline stage names to skip. If None, uses default pipeline.
+    pipeline_profile : str, optional
+        Use a predefined pipeline profile (e.g., 'default', 'minimal').
+        This is mutually exclusive with pipeline_apply_stages / pipeline_skip_stages.
+    pipeline_file : str, optional
+        Path to a pipeline configuration file (.json/.yaml/.toml).
+        This is mutually exclusive with pipeline_profile and pipeline_apply_stages/pipeline_skip_stages.
+    pipeline_apply_handlers : List[str], optional
+        Handlers to apply, in the form ['stage:handler', ...].
+    pipeline_skip_handlers : List[str], optional
+        Handlers to skip, in the form ['stage:handler', ...].
+    metadata : Dict[str, Any], optional
+        User metadata overrides with sections {"global": {...}, "variables": {...}}.
+    metadata_file : str, optional
+        Path to a metadata JSON file with sections {"global": {...}, "variables": {...}}.
+    step_config : Dict[str, Any], optional
+        Configuration for specific processing stages.
+        Example: {'metadata_enrichment': {'include_acdd': True}}
     **kwargs
         Additional reader-specific parameters. Examples:
         - sanitize_input : bool (for SBE CNV files, default=True)
@@ -78,6 +113,44 @@ def read(filename: str, file_format: Optional[str] = None,
                     header_file='adcp_header.hdr')
     ```
     
+    Use custom pipeline stages:
+
+    ```python
+    ds = ssl.read('data.cnv', 
+                  pipeline_apply_stages=['mapping', 'metadata_enrichment'],
+                  step_config={'metadata_enrichment': {'include_acdd': True}})
+    ```
+
+    Use a predefined pipeline profile:
+
+    ```python
+    ds = ssl.read('data.cnv', pipeline_profile='default')
+    ```
+
+    Use a custom pipeline configuration file:
+
+    ```python
+    ds = ssl.read('data.cnv', pipeline_file='my_profile.json')
+    ```
+
+    Provide user metadata directly:
+
+    ```python
+    ds = ssl.read(
+        'data.cnv',
+        metadata={
+            'global': {'title': 'My Cruise'},
+            'variables': {'temperature': {'units': 'degree_C'}}
+        }
+    )
+    ```
+    
+    Get raw data without any processing:
+
+    ```python
+    ds = ssl.read('data.cnv', use_steps=False)
+    ```
+    
     Access the underlying pandas DataFrame:
 
     ```python
@@ -88,10 +161,82 @@ def read(filename: str, file_format: Optional[str] = None,
 
     # Initialize the I/O manager
     io_manager = DataIOManager()
+    
+    # Build pipeline config if steps specified
+    pipeline_config = None
+
+    if pipeline_file is not None:
+        if pipeline_profile is not None:
+            raise ValueError("pipeline_file cannot be combined with pipeline_profile")
+        if pipeline_apply_stages is not None or pipeline_skip_stages is not None:
+            raise ValueError("pipeline_file cannot be combined with pipeline_apply_stages/pipeline_skip_stages")
+        if not use_steps:
+            raise ValueError("pipeline_file cannot be used when use_steps=False")
+        from seasenselib.pipeline import PipelineConfig
+        pipeline_config = PipelineConfig.from_file(pipeline_file)
+        if step_config:
+            for stage_name, config in step_config.items():
+                pipeline_config.upsert_stage(stage_name, config=config)
+    elif pipeline_profile is not None:
+        if pipeline_apply_stages is not None or pipeline_skip_stages is not None:
+            raise ValueError("pipeline_profile cannot be combined with pipeline_apply_stages/pipeline_skip_stages")
+        if not use_steps:
+            raise ValueError("pipeline_profile cannot be used when use_steps=False")
+        from seasenselib.pipeline import PipelineConfig
+        pipeline_config = PipelineConfig.from_resource(pipeline_profile)
+        if step_config:
+            for stage_name, config in step_config.items():
+                pipeline_config.upsert_stage(stage_name, config=config)
+    elif pipeline_apply_stages is not None:
+        from seasenselib.pipeline import PipelineConfig
+        pipeline_config = PipelineConfig()
+        for step_name in pipeline_apply_stages:
+            config = step_config.get(step_name, {}) if step_config else {}
+            pipeline_config.add_stage(step_name, config=config)
+    elif pipeline_skip_stages is not None:
+        from seasenselib.pipeline import PipelineConfig, StageRegistry
+        registry = StageRegistry.get_instance()
+        all_steps = registry.list_stages()
+        selected = [s for s in all_steps if s not in pipeline_skip_stages]
+        pipeline_config = PipelineConfig()
+        for step_name in selected:
+            config = step_config.get(step_name, {}) if step_config else {}
+            pipeline_config.add_stage(step_name, config=config)
+
+    # Apply handler filters (optional)
+    if pipeline_apply_handlers or pipeline_skip_handlers:
+        from seasenselib.pipeline.utils import parse_handler_selectors, apply_handler_filters
+        apply_map = parse_handler_selectors(pipeline_apply_handlers) if pipeline_apply_handlers else {}
+        skip_map = parse_handler_selectors(pipeline_skip_handlers) if pipeline_skip_handlers else {}
+        if pipeline_config is None:
+            from seasenselib.pipeline import PipelineConfig
+            pipeline_config = PipelineConfig.from_resource("default")
+        pipeline_config = apply_handler_filters(pipeline_config, apply_map, skip_map)
+
+    # Load user metadata (file + inline)
+    user_metadata = None
+    if metadata_file is not None:
+        try:
+            import json
+            with open(metadata_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+        except Exception as e:
+            raise ValueError(f"Failed to load metadata file: {metadata_file}") from e
+        from seasenselib.pipeline.utils import normalize_user_metadata
+        user_metadata = normalize_user_metadata(data)
+    if metadata is not None:
+        from seasenselib.pipeline.utils import merge_user_metadata
+        user_metadata = merge_user_metadata(user_metadata, metadata)
 
     try:
         # Use the existing I/O infrastructure to read the data
-        data = io_manager.read_data(filename, file_format, header_file, **kwargs)
+        data = io_manager.read_data(
+            filename, file_format, header_file,
+            use_steps=use_steps,
+            pipeline_config=pipeline_config,
+            user_metadata=user_metadata,
+            **kwargs
+        )
         return data
 
     except (FileNotFoundError, ValueError, RuntimeError):
@@ -294,6 +439,67 @@ def list_plotters() -> List[Dict[str, str]]:
 
     discovery = PlotterDiscovery()
     return discovery.get_format_info()
+
+
+def list_parameters() -> List[Dict[str, str]]:
+    """
+    List canonical parameter names used by the internal data model.
+
+    Returns a list of canonical variable names with short descriptions.
+
+    Returns
+    -------
+    List[Dict[str, str]]
+        List of dictionaries with keys: 'name', 'description'
+
+    Examples
+    --------
+    ```python
+    import seasenselib as ssl
+    for item in ssl.list_parameters():
+        print(f\"{item['name']}: {item['description']}\")
+    ```
+    """
+    try:
+        import seasenselib.parameters as params
+        metadata = getattr(params, 'metadata', {}) or {}
+        default_mappings = getattr(params, 'default_mappings', {}) or {}
+        allowed = params.allowed_parameters()
+    except Exception:
+        metadata = {}
+        default_mappings = {}
+        allowed = {}
+
+    names = set()
+    if isinstance(default_mappings, dict):
+        names.update(default_mappings.keys())
+    if isinstance(metadata, dict):
+        names.update(metadata.keys())
+
+    if names:
+        result = []
+        for name in sorted(names):
+            if isinstance(metadata, dict) and name in metadata:
+                description = _describe_parameter(name, metadata[name])
+            else:
+                description = allowed.get(name) if isinstance(allowed, dict) else None
+                if not description:
+                    description = name.replace('_', ' ').title()
+            result.append({'name': name, 'description': description})
+        return result
+
+    return [{'name': name, 'description': desc} for name, desc in allowed.items()]
+
+
+def _describe_parameter(name: str, info: Dict[str, Any]) -> str:
+    """Build a short description from metadata."""
+    if not isinstance(info, dict):
+        return name.replace('_', ' ').title()
+    long_name = info.get('long_name') or name.replace('_', ' ').title()
+    units = info.get('units')
+    if units:
+        return f"{long_name} ({units})"
+    return long_name
 
 
 def list_all() -> Dict[str, List[Dict[str, str]]]:

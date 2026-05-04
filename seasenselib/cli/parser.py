@@ -77,6 +77,7 @@ class ArgumentParser:
         # Lazy load format lists when needed
         self._input_formats = None
         self._output_formats = None
+        self._default_profiles = ['default', 'minimal', 'full']
 
     @property
     def INPUT_FORMATS(self):
@@ -93,6 +94,35 @@ class ArgumentParser:
             from ..core.autodiscovery import get_output_formats
             self._output_formats = get_output_formats()
         return self._output_formats
+
+    def _get_available_stages(self, lightweight: bool = False):
+        """Get list of available stage names."""
+        from ..pipeline.registry import StageRegistry
+        if lightweight:
+            return StageRegistry.default_stage_names()
+        try:
+            registry = StageRegistry.get_instance()
+            return registry.list_stages()
+        except Exception:
+            # If discovery fails, fall back to the registry defaults.
+            return StageRegistry.default_stage_names()
+
+    def _get_available_profiles(self, lightweight: bool = False):
+        """Get list of available pipeline profile names."""
+        if lightweight:
+            return list(self._default_profiles)
+        try:
+            from importlib import resources
+            profiles = resources.files('seasenselib.config.pipeline')
+            names = []
+            for entry in profiles.iterdir():
+                if entry.name.endswith('.json'):
+                    names.append(entry.name[:-5])
+            return sorted(names)
+        except Exception as exc:
+            raise RuntimeError(
+                "Failed to load pipeline profiles from package resources."
+            ) from exc
 
     def parse_command_quickly(self, args: List[str]) -> Optional[str]:
         """
@@ -175,10 +205,13 @@ class ArgumentParser:
             # If discovery fails for any reason, provide the generic argument
             parser.add_argument('-p', '--parameter', type=str, nargs='*',
                                 help='Parameter(s) to plot (plotter-specific)')
+
+        # Logging options
+        self._add_logging_args(parser)
         
         return parser
 
-    def create_full_parser(self) -> argparse.ArgumentParser:
+    def create_full_parser(self, lightweight: bool = False) -> argparse.ArgumentParser:
         """Create the full argument parser with all subcommands."""
         parser = argparse.ArgumentParser(
             description='SeaSenseLib - Oceanographic sensor data processing',
@@ -188,17 +221,37 @@ class ArgumentParser:
         subparsers = parser.add_subparsers(dest='command', help='Available commands')
 
         # Add all subcommands
-        self._add_convert_parser(subparsers)
-        self._add_show_parser(subparsers)
-        self._add_list_parser(subparsers)
-        self._add_plot_parser(subparsers)
-        self._add_subset_parser(subparsers)
-        self._add_calc_parser(subparsers)
+        self._add_convert_parser(subparsers, lightweight=lightweight)
+        self._add_show_parser(subparsers, lightweight=lightweight)
+        self._add_list_parser(subparsers, lightweight=lightweight)
+        self._add_plot_parser(subparsers, lightweight=lightweight)
+        self._add_subset_parser(subparsers, lightweight=lightweight)
+        self._add_calc_parser(subparsers, lightweight=lightweight)
         
         # Add hidden aliases for backward compatibility
         self._add_formats_alias(subparsers)
 
         return parser
+
+    def create_command_parser(self, command_name: str, lightweight: bool = False) -> argparse.ArgumentParser:
+        """Create a parser for a specific command only."""
+        if command_name == 'convert':
+            return self._add_convert_parser(None, lightweight=lightweight)
+        if command_name == 'show':
+            return self._add_show_parser(None, lightweight=lightweight)
+        if command_name == 'list':
+            return self._add_list_parser(None, lightweight=lightweight)
+        if command_name == 'plot':
+            return self._add_plot_parser(None, lightweight=lightweight)
+        if command_name == 'subset':
+            return self._add_subset_parser(None, lightweight=lightweight)
+        if command_name == 'calc':
+            return self._add_calc_parser(None, lightweight=lightweight)
+        if command_name == 'formats':
+            # legacy alias
+            return self._add_list_parser(None, lightweight=lightweight)
+
+        raise ValueError(f"Unknown command: {command_name}")
 
     def _add_reader_config_args(self, parser):
         """Add reader configuration arguments (for CNV and other formats).
@@ -212,60 +265,175 @@ class ArgumentParser:
                     help='Disable automatic file format fixes (stricter parsing)')
         parser.add_argument('--no-fix-coords', action='store_true', default=False,
                     help='Disable automatic coordinate defaults (require explicit lat/lon)')
+        parser.add_argument('--metadata-file', type=str,
+                    help='Path to a metadata JSON file with sections "global" and "variables"')
+        parser.add_argument('--metadata', type=str,
+                    help='Inline metadata JSON (same structure as --metadata-file). '
+                         'Variables should use canonical names.')
 
-    def _add_convert_parser(self, subparsers):
+    def _add_logging_args(self, parser):
+        """Add logging configuration arguments."""
+        parser.add_argument('--verbose', action='store_true', default=False,
+                    help='Enable verbose logging (info level)')
+        parser.add_argument('--verbose-level', type=str,
+                    choices=['debug', 'info', 'warning', 'error', 'critical'],
+                    help='Set verbosity level explicitly')
+        parser.add_argument('--verbose-log', nargs='?', const=True, default=None,
+                    dest='verbose_log',
+                    help='Write verbose output to a file (optionally specify path)')
+
+    def _add_stage_control_args(self, parser, lightweight: bool = False):
+        """Add processing stage control arguments for data processing pipeline.
+        
+        Parameters
+        ----------
+        parser : argparse.ArgumentParser
+            Parser to add arguments to
+        """
+        available_stages = self._get_available_stages(lightweight=lightweight)
+        steps_list = ', '.join(available_stages)
+        profiles_list = ', '.join(self._get_available_profiles(lightweight=lightweight))
+        
+        parser.add_argument('--raw-only', action='store_true', default=False,
+                    help='Skip all processing and return raw data from file')
+        parser.add_argument('--pipeline-apply-stages', type=str, metavar='STAGE[,STAGE...]',
+                    dest='pipeline_apply_stages',
+                    help=f'Apply only specified pipeline stages (comma-separated). Available: {steps_list}')
+        parser.add_argument('--pipeline-skip-stages', type=str, metavar='STAGE[,STAGE...]',
+                    dest='pipeline_skip_stages',
+                    help=f'Skip specified pipeline stages (comma-separated). Available: {steps_list}')
+        parser.add_argument('--pipeline-profile', dest='pipeline_profile',
+                    help=f'Use a built-in pipeline profile. Available: {profiles_list}')
+        parser.add_argument('--pipeline-file', dest='pipeline_file',
+                    help='Path to a pipeline configuration file (.json/.yaml/.toml)')
+        parser.add_argument('--pipeline-apply-handlers', type=str,
+                    dest='pipeline_apply_handlers',
+                    help='Apply only specified handlers (comma-separated, format: stage:handler)')
+        parser.add_argument('--pipeline-skip-handlers', type=str,
+                    dest='pipeline_skip_handlers',
+                    help='Skip specified handlers (comma-separated, format: stage:handler)')
+
+    def _add_convert_parser(self, subparsers, lightweight: bool = False):
         """Add convert command parser."""
-        # We'll import parameters only when needed
-        try:
-            # pylint: disable=C0415
-            import seasenselib.parameters as params
-            mapping_help = ('Map CNV column names to standard parameter names in the '
-                           'format name=value. Allowed parameter names are: ' +
-                           ', \n'.join(f"{k}" for k, v in params.allowed_parameters().items()))
-        except ImportError:
-            mapping_help = 'Map CNV column names to standard parameter names'
+        if lightweight:
+            mapping_help = 'Map CNV column names to standard parameter names (name=value).'
+        else:
+            # We'll import parameters only when needed
+            try:
+                # pylint: disable=C0415
+                import seasenselib.parameters as params
+                mapping_help = ('Map CNV column names to standard parameter names in the '
+                               'format name=value. Allowed parameter names are: ' +
+                               ', \n'.join(f"{k}" for k, v in params.allowed_parameters().items()))
+            except ImportError:
+                mapping_help = 'Map CNV column names to standard parameter names'
 
-        format_help = 'Choose the output format. Allowed formats are: ' + ', '.join(self.OUTPUT_FORMATS)
+        if lightweight:
+            format_help = 'Choose the output format (use "seasenselib list writers" to see options).'
+            input_choices = None
+            output_choices = None
+        else:
+            format_help = 'Choose the output format. Allowed formats are: ' + ', '.join(self.OUTPUT_FORMATS)
+            input_choices = self.INPUT_FORMATS
+            output_choices = self.OUTPUT_FORMATS
 
-        convert_parser = subparsers.add_parser('convert',
-                    help='Convert a file to a specific format.')
+        if subparsers is None:
+            convert_parser = argparse.ArgumentParser(
+                prog='seasenselib convert',
+                description='Convert a file to a specific format.',
+                formatter_class=_HideFormatsHelpFormatter
+            )
+        else:
+            convert_parser = subparsers.add_parser('convert',
+                        help='Convert a file to a specific format.')
         convert_parser.add_argument('-i', '--input', type=str, required=True,
                     help='Path of input file')
         convert_parser.add_argument('-f', '--input-format',
-                    type=str, default=None, choices=self.INPUT_FORMATS,
+                    type=str, default=None, choices=input_choices,
                     help='Format of input file')
         convert_parser.add_argument('-H', '--header-input', type=str, default=None,
                     help='Path of header input file (for Nortek ASCII files)')
         convert_parser.add_argument('-o', '--output', type=str, required=True,
                     help='Path of output file')
-        convert_parser.add_argument('-F', '--output-format', type=str, choices=self.OUTPUT_FORMATS, 
+        convert_parser.add_argument('-F', '--output-format', type=str, choices=output_choices, 
                     help=format_help)
         convert_parser.add_argument('-m', '--mapping', nargs='+',
                     help=mapping_help)
+        convert_parser.add_argument('--processing-protocol', nargs='?', const=True, default=None,
+                    help='Write a processing protocol (JSON) next to the output (optionally specify path)')
         self._add_reader_config_args(convert_parser)
+        self._add_stage_control_args(convert_parser, lightweight=lightweight)
+        self._add_logging_args(convert_parser)
+        return convert_parser
 
-    def _add_show_parser(self, subparsers):
+    def _add_show_parser(self, subparsers, lightweight: bool = False):
         """Add show command parser."""
-        show_parser = subparsers.add_parser('show',
-                    help='Show contents of a file.')
+        if lightweight:
+            mapping_help = ('Map file-specific column names to standard parameter names '
+                            '(format: original=canonical)')
+            input_choices = None
+        else:
+            # We'll import parameters only when needed
+            try:
+                # pylint: disable=C0415
+                import seasenselib.parameters as params
+                mapping_help = ('Map file-specific column names to standard parameter names in the '
+                               'format original=canonical (e.g., tv290C=temperature). Allowed parameter names are: ' +
+                               ', \n'.join(f"{k}" for k, v in params.allowed_parameters().items()))
+            except ImportError:
+                mapping_help = 'Map file-specific column names to standard parameter names (format: original=canonical)'
+            input_choices = self.INPUT_FORMATS
+
+        if subparsers is None:
+            show_parser = argparse.ArgumentParser(
+                prog='seasenselib show',
+                description='Show contents of a file.',
+                formatter_class=_HideFormatsHelpFormatter
+            )
+        else:
+            show_parser = subparsers.add_parser('show',
+                        help='Show contents of a file.')
         show_parser.add_argument('-i', '--input', type=str, required=True,
                     help='Path of input file')
         show_parser.add_argument('-f', '--input-format', type=str,
-                    default=None, choices=self.INPUT_FORMATS,
+                    default=None, choices=input_choices,
                     help='Format of input file')
         show_parser.add_argument('-H', '--header-input', type=str, default=None,
                     help='Path of header input file (for Nortek ASCII files)')
         show_parser.add_argument('-s', '--schema', type=str,
                     choices=['summary', 'info', 'example'], default='summary',
                     help='What to show.')
+        show_parser.add_argument('-m', '--mapping', nargs='+',
+                    help=mapping_help)
+        show_parser.add_argument('--processing-protocol', nargs='?', const=True, default=None,
+                    help='Write a processing protocol (JSON) next to the input (optionally specify path)')
         self._add_reader_config_args(show_parser)
+        self._add_stage_control_args(show_parser, lightweight=lightweight)
+        self._add_logging_args(show_parser)
+        return show_parser
 
-    def _add_list_parser(self, subparsers):
+    def _add_list_parser(self, subparsers, lightweight: bool = False):
         """Add list command parser."""
-        list_parser = subparsers.add_parser('list',
-                    help='List available readers, writers, and plotters.')
+        if subparsers is None:
+            list_parser = argparse.ArgumentParser(
+                prog='seasenselib list',
+                description='List available readers, writers, plotters, parameters, or pipeline resources.',
+                formatter_class=_HideFormatsHelpFormatter
+            )
+        else:
+            list_parser = subparsers.add_parser('list',
+                        help='List available readers, writers, plotters, parameters, or pipeline resources.')
         list_parser.add_argument('resource_type', type=str, nargs='?', default='all',
-                    choices=['all', 'readers', 'writers', 'plotters'],
+                    choices=[
+                        'all',
+                        'readers',
+                        'writers',
+                        'plotters',
+                        'parameters',
+                        'pipeline-stages',
+                        'pipeline-handlers',
+                        'pipeline-profiles',
+                    ],
                     help='Type of resources to list (default: all)')
         list_parser.add_argument('--output', '-o', type=str,
                     choices=['table', 'json', 'yaml', 'csv'], default='table',
@@ -273,19 +441,28 @@ class ArgumentParser:
         list_parser.add_argument('--filter', '-f', type=str,
                     help='Filter by name or extension (case-insensitive)')
         list_parser.add_argument('--sort', '-s', type=str,
-                    choices=['name', 'key', 'extension', 'type'], default='name',
+                    choices=['name', 'key', 'extension', 'type', 'stage', 'class'], default='name',
                     help='Sort by field (default: name)')
         list_parser.add_argument('--reverse', '-r', action='store_true',
                     help='Reverse sort order')
         list_parser.add_argument('--no-header', action='store_true',
                     help='Omit header row (useful for scripts)')
-        list_parser.add_argument('--verbose', '-v', action='store_true',
+        list_parser.add_argument('--list-details', action='store_true',
                     help='Show additional information like class names')
+        self._add_logging_args(list_parser)
+        return list_parser
 
-    def _add_plot_parser(self, subparsers):
+    def _add_plot_parser(self, subparsers, lightweight: bool = False):
         """Add unified plot command parser (simplified for main help)."""
-        plot_parser = subparsers.add_parser('plot',
-                    help='Create plots using available plotters.')
+        if subparsers is None:
+            plot_parser = argparse.ArgumentParser(
+                prog='seasenselib plot',
+                description='Create plots using available plotters.',
+                formatter_class=_HideFormatsHelpFormatter
+            )
+        else:
+            plot_parser = subparsers.add_parser('plot',
+                        help='Create plots using available plotters.')
         plot_parser.add_argument('plotter', type=str, nargs='?',
                     help='Plotter key (use --list-plotters to see available plotters)')
         plot_parser.add_argument('--list-plotters', action='store_true',
@@ -293,6 +470,7 @@ class ArgumentParser:
         # Add a dummy -i argument to prevent "required" error when just checking help
         plot_parser.add_argument('-i', '--input', type=str,
                     help='Path of input file (use "plot <plotter-key> -h" for plotter-specific help)')
+        self._add_logging_args(plot_parser)
 
     def _add_formats_alias(self, subparsers):
         """Add formats command as a hidden alias for 'list readers' (backward compatibility)."""
@@ -311,25 +489,39 @@ class ArgumentParser:
                     help='Reverse sort order')
         formats_parser.add_argument('--no-header', action='store_true',
                     help='Omit header row (useful for scripts)')
-        formats_parser.add_argument('--verbose', '-v', action='store_true',
+        formats_parser.add_argument('--list-details', action='store_true',
                     help='Show additional information like class names')
 
-    def _add_subset_parser(self, subparsers):
+    def _add_subset_parser(self, subparsers, lightweight: bool = False):
         """Add subset command parser."""
-        format_help = 'Choose the output format. Allowed formats are: ' + ', '.join(self.OUTPUT_FORMATS)
+        if lightweight:
+            format_help = 'Choose the output format (use "seasenselib list writers" to see options).'
+            input_choices = None
+            output_choices = None
+        else:
+            format_help = 'Choose the output format. Allowed formats are: ' + ', '.join(self.OUTPUT_FORMATS)
+            input_choices = self.INPUT_FORMATS
+            output_choices = self.OUTPUT_FORMATS
 
-        subset_parser = subparsers.add_parser('subset', 
-                    help='Extract a subset of a file.')
+        if subparsers is None:
+            subset_parser = argparse.ArgumentParser(
+                prog='seasenselib subset',
+                description='Extract a subset of a file.',
+                formatter_class=_HideFormatsHelpFormatter
+            )
+        else:
+            subset_parser = subparsers.add_parser('subset', 
+                        help='Extract a subset of a file.')
         subset_parser.add_argument('-i', '--input', type=str, required=True, 
                     help='Path of input file')
         subset_parser.add_argument('-f', '--input-format', type=str, 
-                    default=None, choices=self.INPUT_FORMATS,
+                    default=None, choices=input_choices,
                     help='Format of input file')
         subset_parser.add_argument('-H', '--header-input', type=str, default=None,
                     help='Path of header input file (for Nortek ASCII files)')
         subset_parser.add_argument('-o', '--output', type=str,
                     help='Path of output file')
-        subset_parser.add_argument('-F', '--output-format', type=str, choices=self.OUTPUT_FORMATS, 
+        subset_parser.add_argument('-F', '--output-format', type=str, choices=output_choices, 
                     help=format_help)
         subset_parser.add_argument('--time-min', type=str, 
                     help='Minimum datetime value. Formats are: YYYY-MM-DD HH:ii:mm.ss')
@@ -346,26 +538,42 @@ class ArgumentParser:
         subset_parser.add_argument('--value-max', type=float, 
                     help='Maximum value for the specified parameter')
         self._add_reader_config_args(subset_parser)
+        self._add_logging_args(subset_parser)
+        return subset_parser
 
-    def _add_calc_parser(self, subparsers):
+    def _add_calc_parser(self, subparsers, lightweight: bool = False):
         """Add calc command parser."""
-        format_help = 'Choose the output format. Allowed formats are: ' + ', '.join(self.OUTPUT_FORMATS)
+        if lightweight:
+            format_help = 'Choose the output format (use "seasenselib list writers" to see options).'
+            input_choices = None
+            output_choices = None
+        else:
+            format_help = 'Choose the output format. Allowed formats are: ' + ', '.join(self.OUTPUT_FORMATS)
+            input_choices = self.INPUT_FORMATS
+            output_choices = self.OUTPUT_FORMATS
         method_choices = [
             'min', 'max', 'mean', 'arithmetic_mean', 'median', 'std',
             'standard_deviation', 'var', 'variance', 'sum'
         ]
 
-        calc_parser = subparsers.add_parser('calc',
-                    help='Run an aggregate function on parameters of a dataset.')
+        if subparsers is None:
+            calc_parser = argparse.ArgumentParser(
+                prog='seasenselib calc',
+                description='Run an aggregate function on parameters of a dataset.',
+                formatter_class=_HideFormatsHelpFormatter
+            )
+        else:
+            calc_parser = subparsers.add_parser('calc',
+                        help='Run an aggregate function on parameters of a dataset.')
         calc_parser.add_argument('-i', '--input', type=str, required=True, 
                     help='Path of input file')
         calc_parser.add_argument('-f', '--input-format', type=str, default=None,
-                    choices=self.INPUT_FORMATS, help='Format of input file')
+                    choices=input_choices, help='Format of input file')
         calc_parser.add_argument('-H', '--header-input', type=str, default=None,
                     help='Path of header input file (for Nortek ASCII files)')
         calc_parser.add_argument('-o', '--output', type=str, 
                     help='Path of output file')
-        calc_parser.add_argument('-F', '--output-format', type=str, choices=self.OUTPUT_FORMATS,
+        calc_parser.add_argument('-F', '--output-format', type=str, choices=output_choices,
                     help=format_help)
         calc_parser.add_argument('-M', '--method', type=str, choices=method_choices,
                     help='Mathematical method operated on the values.')
@@ -376,3 +584,5 @@ class ArgumentParser:
         calc_parser.add_argument('-T', '--time-interval', type=str,
                     help='Time interval for resampling. Examples: 1M (one month)')
         self._add_reader_config_args(calc_parser)
+        self._add_logging_args(calc_parser)
+        return calc_parser

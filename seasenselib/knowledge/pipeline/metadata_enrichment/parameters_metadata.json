@@ -1,0 +1,160 @@
+{
+  "battery_voltage": {
+    "long_name": "Battery voltage",
+    "standard_name": "battery_voltage",
+    "units": "volts"
+  },
+  "conductivity": {
+    "coverage_content_type": "physicalMeasurement",
+    "long_name": "Conductivity",
+    "measurement_type": "Measured",
+    "short_name": "COND",
+    "standard_name": "sea_water_electrical_conductivity",
+    "units": "S m-1"
+  },
+  "correlation": {
+    "long_name": "Correlation",
+    "standard_name": "correlation",
+    "units": "unitless"
+  },
+  "density": {
+    "long_name": "Density",
+    "measurement_type": "Derived",
+    "standard_name": "sea_water_density",
+    "units": "kg m-3"
+  },
+  "depth": {
+    "coverage_content_type": "coordinate",
+    "long_name": "Depth",
+    "positive": "up",
+    "short_name": "D",
+    "standard_name": "depth",
+    "units": "meters"
+  },
+  "direction": {
+    "long_name": "Current direction",
+    "standard_name": "direction",
+    "units": "degrees"
+  },
+  "east_velocity": {
+    "long_name": "Eastward velocity",
+    "standard_name": "eastward_sea_water_velocity",
+    "units": "m/s"
+  },
+  "echo_intensity": {
+    "long_name": "Echo intensity",
+    "standard_name": "echo_intensity",
+    "units": "dB"
+  },
+  "heading": {
+    "long_name": "Heading angle",
+    "standard_name": "platform_heading_angle",
+    "units": "degrees"
+  },
+  "latitude": {
+    "coverage_content_type": "coordinate",
+    "long_name": "Latitude",
+    "short_name": "lat",
+    "standard_name": "latitude",
+    "units": "degrees_north"
+  },
+  "longitude": {
+    "coverage_content_type": "coordinate",
+    "long_name": "Longitude",
+    "short_name": "lon",
+    "standard_name": "longitude",
+    "units": "degrees_east"
+  },
+  "magnitude": {
+    "long_name": "Current magnitude",
+    "standard_name": "magnitude",
+    "units": "m/s"
+  },
+  "north_velocity": {
+    "long_name": "Northward velocity",
+    "standard_name": "northward_sea_water_velocity",
+    "units": "m/s"
+  },
+  "oxygen": {
+    "coverage_content_type": "physicalMeasurement",
+    "long_name": "Oxygen",
+    "standard_name": "volume_fraction_of_oxygen_in_sea_water"
+  },
+  "pitch": {
+    "long_name": "Pitch angle",
+    "standard_name": "platform_pitch_angle",
+    "units": "degrees"
+  },
+  "potential_temperature": {
+    "long_name": "Potential Temperature \u03b8",
+    "measurement_type": "Derived",
+    "standard_name": "sea_water_potential_temperature",
+    "units": "degC"
+  },
+  "conservative_temperature": {
+    "long_name": "Conservative Temperature",
+    "measurement_type": "Derived",
+    "standard_name": "sea_water_conservative_temperature",
+    "units": "degC"
+  },
+  "absolute_salinity": {
+    "long_name": "Absolute Salinity",
+    "measurement_type": "Derived",
+    "standard_name": "sea_water_absolute_salinity",
+    "units": "g kg-1"
+  },
+  "power_supply_input": {
+    "long_name": "Power supply input voltage",
+    "units": "V"
+  },
+  "pressure": {
+    "coverage_content_type": "physicalMeasurement",
+    "long_name": "Pressure",
+    "measurement_type": "Measured",
+    "short_name": "WP",
+    "standard_name": "sea_water_pressure",
+    "units": "dbar"
+  },
+  "roll": {
+    "long_name": "Roll angle",
+    "standard_name": "platform_roll_angle",
+    "units": "degrees"
+  },
+  "salinity": {
+    "coverage_content_type": "physicalMeasurement",
+    "long_name": "Salinity",
+    "measurement_type": "Derived",
+    "short_name": "SAL",
+    "standard_name": "sea_water_salinity"
+  },
+  "speed_of_sound": {
+    "long_name": "Speed of sound in sea water",
+    "standard_name": "speed_of_sound_in_sea_water",
+    "units": "m/s"
+  },
+  "temperature": {
+    "coverage_content_type": "physicalMeasurement",
+    "long_name": "Temperature",
+    "measurement_type": "Measured",
+    "short_name": "WT",
+    "standard_name": "sea_water_temperature",
+    "units": "ITS-90, deg C"
+  },
+  "time": {
+    "coverage_content_type": "coordinate",
+    "long_name": "Time",
+    "standard_name": "time"
+  },
+  "turbidity": {
+    "coverage_content_type": "physicalMeasurement",
+    "long_name": "Turbidity",
+    "measurement_type": "Measured",
+    "short_name": "TURB",
+    "standard_name": "sea_water_turbidity"
+  },
+  "up_velocity": {
+    "long_name": "Upward velocity",
+    "standard_name": "upward_sea_water_velocity",
+    "units": "m/s"
+  }
+}

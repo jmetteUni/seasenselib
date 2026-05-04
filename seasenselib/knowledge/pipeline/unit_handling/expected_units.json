@@ -1,0 +1,23 @@
+{
+  "battery_voltage": "volts",
+  "conductivity": "S m-1",
+  "correlation": "unitless",
+  "density": "kg m-3",
+  "depth": "meters",
+  "direction": "degrees",
+  "east_velocity": "m/s",
+  "echo_intensity": "dB",
+  "heading": "degrees",
+  "latitude": "degrees_north",
+  "longitude": "degrees_east",
+  "magnitude": "m/s",
+  "north_velocity": "m/s",
+  "pitch": "degrees",
+  "potential_temperature": "K",
+  "power_supply_input": "V",
+  "pressure": "dbar",
+  "roll": "degrees",
+  "speed_of_sound": "m/s",
+  "temperature": "K",
+  "up_velocity": "m/s"
+}

@@ -106,7 +106,7 @@ class TestDatasetProcessor(unittest.TestCase):
         
         # Check for CF convention
         self.assertIn('Conventions', ds_with_attrs.attrs)
-        self.assertEqual(ds_with_attrs.attrs['Conventions'], 'CF-1.8')
+        self.assertEqual(ds_with_attrs.attrs['Conventions'], 'CF-1.13')
 
     def test_assign_default_global_attributes_history(self):
         """Test that history attribute is added."""
@@ -277,7 +277,7 @@ if __name__ == '__main__':
         
         # Check for CF convention
         self.assertIn('Conventions', ds_with_attrs.attrs)
-        self.assertEqual(ds_with_attrs.attrs['Conventions'], 'CF-1.8')
+        self.assertEqual(ds_with_attrs.attrs['Conventions'], 'CF-1.13')
 
     def test_assign_default_global_attributes_history(self):
         """Test that history attribute is added."""

@@ -73,12 +73,15 @@ class RbrRskAutoReader(AbstractReader):
             - sort_variables : bool, default=True
                 Whether to sort variables alphabetically.
         """
-        super().__init__(input_file, mapping, **kwargs)
+        # Avoid running the pipeline twice: delegate reader handles postprocessing.
+        delegate_use_steps = kwargs.pop("use_steps", True)
+        super().__init__(input_file, mapping, use_steps=False, **kwargs)
         self._reader_format_name = None
         self._reader_format_key = None
         self._validate_file()
         # Store kwargs to pass to delegate reader
-        self._kwargs = kwargs
+        self._delegate_use_steps = delegate_use_steps
+        self._kwargs = dict(kwargs)
 
     @classmethod
     def _get_valid_extensions(cls) -> tuple[str, ...]:
@@ -122,12 +125,14 @@ class RbrRskAutoReader(AbstractReader):
             reader = RbrRskReader(
                 self.input_file,
                 mapping=self.mapping,
+                use_steps=self._delegate_use_steps,
                 **self._kwargs
             )
         else:
             reader = RbrRskLegacyReader(
                 self.input_file,
                 mapping=self.mapping,
+                use_steps=self._delegate_use_steps,
                 **self._kwargs
             )
 

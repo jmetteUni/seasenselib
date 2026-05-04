@@ -3,9 +3,7 @@ Module for creating T-S (Temperature-Salinity) diagrams from sensor data.
 """
 
 from __future__ import annotations
-import matplotlib.pyplot as plt
 import numpy as np
-import gsw
 
 from seasenselib.plotters.base import AbstractPlotter
 import seasenselib.parameters as params
@@ -67,6 +65,8 @@ class TsDiagramPlotter(AbstractPlotter):
         required_vars = [params.TEMPERATURE, params.SALINITY, params.DEPTH]
         self._validate_required_variables(required_vars)
 
+        plt = self._get_plt()
+
         # Get dataset without NaN values
         ds = self._get_dataset_without_nan()
 
@@ -126,6 +126,14 @@ class TsDiagramPlotter(AbstractPlotter):
         ds : xr.Dataset
             The dataset containing temperature and salinity data.
         """
+        try:
+            import gsw  # type: ignore
+        except ImportError as exc:
+            raise ImportError(
+                "GSW library is required for density isolines. "
+                "Install with: pip install gsw"
+            ) from exc
+
         # Define the min / max values for plotting isopycnals
         t_min = ds[params.TEMPERATURE].values.min()
         t_max = ds[params.TEMPERATURE].values.max()
@@ -166,6 +174,7 @@ class TsDiagramPlotter(AbstractPlotter):
         sigma_t = density - 1000
 
         # Plot isolines
+        plt = self._get_plt()
         cs = plt.contour(si, ti, sigma_t, linewidths=1, linestyles='dashed', colors='gray')
         plt.clabel(cs, fontsize=8, inline=1, fmt='%1.2f')  # Label every second level
 

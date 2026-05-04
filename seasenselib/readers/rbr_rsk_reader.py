@@ -127,8 +127,6 @@ class RbrRskReader(AbstractReader):
             ds.attrs['rsk_type'] = self._db_info.type
 
         # Perform default post-processing
-        ds = self._perform_default_postprocessing(ds)
-
         return ds
 
     @classmethod
@@ -142,3 +140,19 @@ class RbrRskReader(AbstractReader):
     @classmethod
     def file_extension(cls) -> str | None:
         return None
+    
+    @classmethod
+    def format_mappings(cls) -> dict:
+        """Get RBR RSK format-specific variable name mappings.
+        
+        Returns:
+            Dictionary mapping canonical parameter names to RBR-specific
+            variable name patterns commonly found in RSK files.
+        """
+        return {
+            params.TEMPERATURE: ['temperature_00', 'temperature_01', 'temperature'],
+            params.CONDUCTIVITY: ['conductivity_00', 'conductivity_01', 'conductivity'],
+            params.PRESSURE: ['sea_pressure', 'pressure'],
+            params.SALINITY: ['salinity_00', 'salinity_01', 'salinity'],
+            params.DEPTH: ['depth'],
+        }

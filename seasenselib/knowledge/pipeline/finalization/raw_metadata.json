@@ -1,0 +1,14 @@
+{
+  "preserve_global_attributes": [
+    "platform",
+    "platform_vocabulary",
+    "deployment_id",
+    "station",
+    "cast",
+    "cruise",
+    "campaign",
+    "site",
+    "program",
+    "project"
+  ]
+}

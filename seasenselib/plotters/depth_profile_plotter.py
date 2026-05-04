@@ -3,7 +3,6 @@ Module for creating vertical CTD profiles from sensor data.
 """
 
 from __future__ import annotations
-import matplotlib.pyplot as plt
 from seasenselib.plotters.base import AbstractPlotter
 import seasenselib.parameters as params
 
@@ -55,6 +54,8 @@ class DepthProfilePlotter(AbstractPlotter):
         # Validate required variables
         required_vars = [params.TEMPERATURE, params.SALINITY, params.DEPTH]
         self._validate_required_variables(required_vars)
+
+        plt = self._get_plt()
 
         # Get dataset without NaN values
         ds = self._get_dataset_without_nan()

@@ -189,3 +189,23 @@ class NortekAsciiReader(AbstractReader):
     @classmethod
     def file_extension(cls) -> str | None:
         return None
+    
+    @classmethod
+    def format_mappings(cls) -> dict:
+        """Get Nortek ASCII format-specific variable name mappings.
+        
+        Returns:
+            Dictionary mapping canonical parameter names to Nortek-specific
+            variable name patterns commonly found in ASCII export files.
+        """
+        return {
+            params.EAST_VELOCITY: ['Velocity (Beam1|X|East)', 'Eastward velocity'],
+            params.NORTH_VELOCITY: ['Velocity (Beam2|Y|North)', 'Northward velocity'],
+            params.UP_VELOCITY: ['Velocity (Beam3|Z|Up)', 'Upward velocity'],
+            params.EAST_AMPLITUDE: ['Amplitude (Beam1)', 'Eastward amplitude'],
+            params.NORTH_AMPLITUDE: ['Amplitude (Beam2)', 'Northward amplitude'],
+            params.UP_AMPLITUDE: ['Amplitude (Beam3)', 'Upward amplitude'],
+            params.SPEED_OF_SOUND: ['Soundspeed', 'Speed of Sound'],
+            params.PRESSURE: ['Pressure'],
+            params.TEMPERATURE: ['Temperature'],
+        }

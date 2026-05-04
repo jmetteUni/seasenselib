@@ -1,6 +1,9 @@
 """
 Dataset processing utilities for xarray Datasets.
 
+**DEPRECATED**: This module is deprecated and will be removed in v0.6.0.
+Use the stage system instead: from seasenselib.pipeline import default_pipeline
+
 This module provides static methods for transforming xarray Datasets,
 including sorting variables, renaming parameters, deriving oceanographic
 parameters, and assigning global attributes.
@@ -9,6 +12,7 @@ parameters, and assigning global attributes.
 from __future__ import annotations
 import platform
 import re
+import warnings
 from collections import defaultdict
 from datetime import datetime, timezone
 from importlib.metadata import version
@@ -24,6 +28,17 @@ MODULE_NAME = 'seasenselib'
 class DatasetProcessor:
     """
     Utility class for xarray Dataset transformations.
+    
+    **DEPRECATED**: This class is deprecated and will be removed in v0.6.0.
+    Use the stage system instead:
+    
+    .. code-block:: python
+    
+        from seasenselib.pipeline import default_pipeline
+        
+        # Instead of DatasetProcessor methods:
+        pipeline = default_pipeline()
+        processed_ds = pipeline.process(raw_ds)
     
     All methods are static and operate on xarray Datasets directly.
     These methods handle:
@@ -41,6 +56,20 @@ class DatasetProcessor:
     >>> ds = DatasetProcessor.sort_variables(ds)
     >>> ds = DatasetProcessor.rename_parameters(ds)
     """
+    
+    def __init__(self):
+        """
+        Initialize DatasetProcessor.
+        
+        **DEPRECATED**: This class is deprecated and will be removed in v0.6.0.
+        Use the stage system instead: from seasenselib.pipeline import default_pipeline
+        """
+        warnings.warn(
+            "DatasetProcessor is deprecated and will be removed in v0.6.0. "
+            "Use the stage system instead: from seasenselib.pipeline import default_pipeline",
+            DeprecationWarning,
+            stacklevel=2
+        )
     
     @staticmethod
     def sort_variables(ds: xr.Dataset) -> xr.Dataset:
@@ -83,6 +112,8 @@ class DatasetProcessor:
         """
         Rename variables in an xarray Dataset according to standard mappings.
         
+        **DEPRECATED**: Use MappingStage from the stage system instead.
+        
         Handles aliases with or without trailing numbering and ensures unique 
         standard names with numbering. If a standard name only occurs once, 
         it will not have a numbering suffix.
@@ -108,6 +139,12 @@ class DatasetProcessor:
         >>> 'temperature' in renamed.data_vars
         True
         """
+        warnings.warn(
+            "DatasetProcessor.rename_parameters() is deprecated. "
+            "Use MappingStage from the stage system instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         ds_vars = list(ds.variables)
         rename_dict = {}
 
@@ -160,6 +197,8 @@ class DatasetProcessor:
         """
         Derive oceanographic parameters from temperature, pressure, and salinity.
         
+        **DEPRECATED**: Use DerivationStage from the stage system instead.
+        
         Calculates derived parameters like density and potential temperature
         using the Gibbs SeaWater (GSW) oceanographic toolbox when temperature, 
         pressure, and salinity data are available.
@@ -185,6 +224,12 @@ class DatasetProcessor:
         Requires temperature, salinity, and pressure to be present in the dataset.
         If any are missing, returns the dataset unchanged.
         """
+        warnings.warn(
+            "DatasetProcessor.derive_oceanographic_parameters() is deprecated. "
+            "Use DerivationStage from the stage system instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         # Find the appropriate temperature variable
         temperature_var = None
         if params.TEMPERATURE in ds.data_vars:
@@ -271,7 +316,7 @@ class DatasetProcessor:
         )
 
         ds.attrs['history'] = history_entry
-        ds.attrs['Conventions'] = 'CF-1.8'
+        ds.attrs['Conventions'] = 'CF-1.13'
 
         # Information about the processor of the xarray dataset
         ds.attrs['processor_name'] = module_name

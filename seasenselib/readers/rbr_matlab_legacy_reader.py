@@ -266,7 +266,7 @@ class RbrMatlabLegacyReader(AbstractReader):
             data_vars=data_vars,
             coords=coords,
             attrs={
-                "Conventions": "CF-1.8",
+                "Conventions": "CF-1.13",
                 "title": "RBR oceanographic data",
                 "source": "RBR instrument (legacy MATLAB export)",
                 "rbr_serial_number": self._serial_number,
@@ -288,8 +288,6 @@ class RbrMatlabLegacyReader(AbstractReader):
             super()._assign_metadata_for_key_to_xarray_dataset(ds, key)
         
         # Perform default post-processing
-        ds = self._perform_default_postprocessing(ds)
-        
         return ds
 
     def _load_data(self) -> xr.Dataset:

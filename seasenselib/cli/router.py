@@ -5,12 +5,13 @@ This module handles command routing and execution.
 """
 
 import sys
+import logging
 from typing import List
-from ..core import DataIOManager
 from ..core.exceptions import SeaSenseLibError
 from .parser import ArgumentParser
 from .commands import CommandFactory
 
+logger = logging.getLogger(__name__)
 
 class CLIRouter:
     """Main CLI router.
@@ -36,10 +37,15 @@ class CLIRouter:
     """
 
     def __init__(self):
-        # Initialize DataIO manager
-        self.io_manager = DataIOManager()
+        self._io_manager = None
         self.argument_parser = ArgumentParser()
         self.command_factory = CommandFactory()
+
+    def _get_io_manager(self):
+        if self._io_manager is None:
+            from ..core import DataIOManager
+            self._io_manager = DataIOManager()
+        return self._io_manager
 
     def route_and_execute(self, args: List[str]) -> int:
         """Route command and execute with lazy loading.
@@ -76,7 +82,7 @@ class CLIRouter:
 
             if not command_name:
                 # No command specified or help requested
-                parser = self.argument_parser.create_full_parser()
+                parser = self.argument_parser.create_full_parser(lightweight=True)
                 parser.print_help()
                 return 0
 
@@ -84,14 +90,29 @@ class CLIRouter:
             if command_name == 'plot':
                 return self._handle_plot_command(args)
 
+            help_requested = '-h' in args or '--help' in args
+
+            try:
+                parser = self.argument_parser.create_command_parser(
+                    command_name, lightweight=help_requested
+                )
+            except ValueError as exc:
+                print(f"Error: {exc}", file=sys.stderr)
+                return 1
+
+            if help_requested:
+                parser.print_help()
+                return 0
+
+            parsed_args = parser.parse_args(args[1:])
+
+            # Configure logging if requested
+            self._configure_logging(parsed_args)
+
             # Create command instance
             command = self.command_factory.create_command(
-                command_name, self.io_manager
+                command_name, self._get_io_manager()
             )
-
-            # Parse full arguments for this specific command
-            parser = self.argument_parser.create_full_parser()
-            parsed_args = parser.parse_args(args)
 
             # Execute command
             result = command.execute(parsed_args)
@@ -182,6 +203,7 @@ class CLIRouter:
         # Remove 'plot' and plotter_key from args for parsing
         remaining_args = [arg for i, arg in enumerate(args) if not (i == 0 or (i == 1 and arg == plotter_key))]
         parsed_args = parser.parse_args(remaining_args)
+        self._configure_logging(parsed_args)
         # Add back the plotter key
         parsed_args.plotter = plotter_key
         # Add default values for optional args that might not be in this specific parser
@@ -189,7 +211,7 @@ class CLIRouter:
             parsed_args.list_plotters = False
         
         # Create and execute command
-        command = self.command_factory.create_command('plot', self.io_manager)
+        command = self.command_factory.create_command('plot', self._get_io_manager())
         result = command.execute(parsed_args)
         
         # Print error message if command failed
@@ -197,3 +219,57 @@ class CLIRouter:
             print(result.message, file=sys.stderr)
         
         return 0 if result.success else 1
+
+    @staticmethod
+    def _configure_logging(parsed_args) -> None:
+        """Configure logging based on CLI flags."""
+        verbose = getattr(parsed_args, 'verbose', False)
+        level_name = getattr(parsed_args, 'verbose_level', None)
+        log_target = getattr(parsed_args, 'verbose_log', None)
+
+        if not verbose and not log_target:
+            # Clamp SeaSenseLib logs to warnings by default to avoid noisy INFO output
+            logging.getLogger("seasenselib").setLevel(logging.WARNING)
+            return
+
+        if level_name:
+            level = getattr(logging, level_name.upper(), logging.INFO)
+        else:
+            level = logging.INFO
+
+        log_path = None
+        if log_target:
+            if isinstance(log_target, str):
+                log_path = log_target
+            else:
+                output = getattr(parsed_args, 'output', None)
+                if output:
+                    log_path = f"{output}.log"
+                else:
+                    log_path = "seasenselib.log"
+            try:
+                from pathlib import Path
+                Path(log_path).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
+            except Exception:
+                logger.debug("Failed to create log directory for '%s'", log_path, exc_info=True)
+
+        handlers = []
+        if verbose:
+            stream_handler = logging.StreamHandler()
+            stream_handler.setLevel(level)
+            handlers.append(stream_handler)
+
+        if log_path:
+            file_handler = logging.FileHandler(log_path)
+            file_handler.setLevel(level)
+            handlers.append(file_handler)
+
+        if not handlers:
+            return
+
+        logging.basicConfig(
+            level=level,
+            format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+            handlers=handlers,
+            force=True
+        )

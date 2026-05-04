@@ -4,11 +4,15 @@ Module for reading CTD data from SBE ASCII files.
 
 from __future__ import annotations
 import re
+import logging
 from datetime import datetime
 import pandas as pd
 import xarray as xr
 
 from seasenselib.readers.base import AbstractReader
+import seasenselib.parameters as params
+
+logger = logging.getLogger(__name__)
 
 class SbeAsciiReader(AbstractReader):
     """Reads CTD data from a SeaBird ASCII file into an xarray Dataset."""
@@ -93,7 +97,7 @@ class SbeAsciiReader(AbstractReader):
 
         #  Inject default reference pressure if missing
         if "reference pressure" not in (k.lower() for k in metadata):
-            print("Injecting default reference pressure: 0.0 db")  # Debug line
+            logger.debug("Injecting default reference pressure: 0.0 db")
             metadata["reference pressure"] = "0.0 db"
 
         # Prepare data list
@@ -123,30 +127,27 @@ class SbeAsciiReader(AbstractReader):
         return df, metadata
 
     def _create_xarray_dataset(self, df, metadata, sample_interval, instrument_type):
+        """Create xarray dataset from pandas dataframe.
+        
+        Returns raw dataset with format-specific variable names.
+        Variable mapping and metadata enrichment handled by stages.
+        """
         ds = xr.Dataset.from_dataframe(df)
 
-        ds = ds.rename_vars({'temperature': 'temperature', 'conductivity': 'conductivity'})
+        # Add minimal units from raw data (stages will enrich with CF metadata)
+        ds['temperature'].attrs = {'units': '°C'}
+        ds['conductivity'].attrs = {'units': 'S/m'}
+        if 'pressure' in ds.data_vars:
+            ds['pressure'].attrs = {'units': 'dbar'}
 
-        ds['temperature'].attrs = {
-            "units": "°C",
-            "long_name": "Temperature",
-            "standard_name": "sea_water_temperature"
-        }
-        ds['conductivity'].attrs = {
-            "units": "S/m",
-            "long_name": "Conductivity",
-            "standard_name": "sea_water_conductivity"
-        }
-
+        # Add source information and metadata
         ds.attrs.update(metadata)
-        ds.attrs["Conventions"] = "CF-1.8"
-        ds.attrs["title"] = "CTD Data"
-        ds.attrs["institution"] = "University of Hamburg"
-        ds.attrs["source"] = instrument_type
+        ds.attrs['source'] = instrument_type
 
         if sample_interval:
-            ds.attrs["information"] = f"sample interval {sample_interval} seconds"
-            # Assign meta information for all attributes of the xarray Dataset
+            ds.attrs['information'] = f"sample interval {sample_interval} seconds"
+        
+        # Assign meta information for all attributes of the xarray Dataset
         for key in (list(ds.data_vars.keys()) + list(ds.coords.keys())):
             super()._assign_metadata_for_key_to_xarray_dataset( ds, key)
 
@@ -165,6 +166,21 @@ class SbeAsciiReader(AbstractReader):
         instrument_type = self._extract_instrument_type(self.input_file)
         ds = self._create_xarray_dataset(df, metadata, sample_interval, instrument_type)
         return ds
+
+    @classmethod
+    def format_mappings(cls) -> dict[str, list]:
+        """Return SeaBird ASCII format-specific variable name mappings.
+        
+        Returns
+        -------
+        dict[str, list]
+            Dictionary mapping standard names to SBE ASCII format-specific aliases.
+        """
+        return {
+            params.TEMPERATURE: ['temperature'],
+            params.CONDUCTIVITY: ['conductivity'],
+            params.PRESSURE: ['pressure'],
+        }
 
     @classmethod
     def format_key(cls) -> str:

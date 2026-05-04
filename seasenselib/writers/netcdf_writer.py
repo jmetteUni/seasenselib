@@ -1,7 +1,10 @@
 """
 Module for writing sensor data to netCDF files.
 """
+import logging
 from seasenselib.writers.base import AbstractWriter
+
+logger = logging.getLogger(__name__)
 
 class NetCdfWriter(AbstractWriter):
     """ Writes sensor data from a xarray Dataset to a netCDF file. 
@@ -73,7 +76,9 @@ class NetCdfWriter(AbstractWriter):
             for attr_name, attr_value in list(coord.attrs.items()):
                 ds[coord_name].attrs[attr_name] = clean_attr_value(attr_value)
 
+        logger.info("Writing netCDF file to '%s'", file_name)
         ds.to_netcdf(file_name)
+        logger.info("Wrote netCDF file to '%s'", file_name)
 
     @staticmethod
     def file_extension() -> str:

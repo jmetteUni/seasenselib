@@ -1,0 +1,58 @@
+{
+  "density": {
+    "standard_name": "sea_water_density",
+    "long_name": "Sea Water Density",
+    "units": "kg m-3",
+    "comment": "Calculated using GSW TEOS-10 library",
+    "derivation_method": "TEOS-10 GSW",
+    "derivation_function": "gsw.rho",
+    "derivation_standard": "TEOS-10",
+    "reference": "IOC, SCOR and IAPSO, 2010: The international thermodynamic equation of seawater – 2010"
+  },
+  "depth": {
+    "standard_name": "depth",
+    "long_name": "Depth",
+    "units": "meters",
+    "comment": "Calculated from pressure and latitude using GSW TEOS-10",
+    "derivation_method": "TEOS-10 GSW",
+    "derivation_function": "gsw.z_from_p",
+    "reference": "IOC, SCOR and IAPSO, 2010: The international thermodynamic equation of seawater – 2010"
+  },
+  "potential_temperature": {
+    "standard_name": "sea_water_potential_temperature",
+    "long_name": "Potential Temperature",
+    "units": "degree_C",
+    "comment": "Calculated using GSW TEOS-10 library, referenced to 0 dbar",
+    "reference_pressure": "0 dbar",
+    "derivation_method": "TEOS-10 GSW",
+    "derivation_function": "gsw.pt0_from_t",
+    "reference": "IOC, SCOR and IAPSO, 2010: The international thermodynamic equation of seawater – 2010"
+  },
+  "conservative_temperature": {
+    "standard_name": "sea_water_conservative_temperature",
+    "long_name": "Conservative Temperature",
+    "units": "degC",
+    "comment": "Calculated using GSW TEOS-10 library",
+    "derivation_method": "TEOS-10 GSW",
+    "derivation_function": "gsw.CT_from_t",
+    "reference": "IOC, SCOR and IAPSO, 2010: The international thermodynamic equation of seawater – 2010"
+  },
+  "absolute_salinity": {
+    "standard_name": "sea_water_absolute_salinity",
+    "long_name": "Absolute Salinity",
+    "units": "g kg-1",
+    "comment": "Calculated using GSW TEOS-10 library from practical salinity, pressure, and geographic coordinates",
+    "derivation_method": "TEOS-10 GSW",
+    "derivation_function": "gsw.SA_from_SP",
+    "reference": "IOC, SCOR and IAPSO, 2010: The international thermodynamic equation of seawater – 2010"
+  },
+  "sound_speed": {
+    "standard_name": "speed_of_sound_in_sea_water",
+    "long_name": "Speed of Sound in Sea Water",
+    "units": "m s-1",
+    "comment": "Calculated using GSW TEOS-10 library",
+    "derivation_method": "TEOS-10 GSW",
+    "derivation_function": "gsw.sound_speed",
+    "reference": "IOC, SCOR and IAPSO, 2010: The international thermodynamic equation of seawater – 2010"
+  }
+}

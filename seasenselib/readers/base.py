@@ -14,11 +14,14 @@ from pathlib import Path
 from typing import Dict, Any
 import re
 import warnings
+import logging
 import xarray as xr
 import seasenselib.parameters as params
 from seasenselib.readers.utils import TimeConverter, DatasetProcessor, DatasetBuilder
+from seasenselib.pipeline.utils import apply_user_metadata, normalize_user_metadata
 
 MODULE_NAME = 'seasenselib'
+logger = logging.getLogger(__name__)
 
 
 class AbstractReader(ABC):
@@ -80,6 +83,8 @@ class AbstractReader(ABC):
                  input_header_file: str | None = None,
                  perform_default_postprocessing: bool = True, rename_variables: bool = True,
                  assign_metadata: bool = True, sort_variables: bool = True,
+                 use_steps: bool = True, pipeline_config: Any = None,
+                 user_metadata: Dict[str, Any] | None = None,
                  **kwargs):
         """Initializes the AbstractReader with the input file and optional mapping.
 
@@ -104,6 +109,13 @@ class AbstractReader(ABC):
             Whether to assign CF metadata to xarray variables. Default is True.
         sort_variables : bool, optional
             Whether to sort xarray variables by name. Default is True.
+        use_steps : bool, optional
+            Whether to use the processing step pipeline system. Default is True.
+            If False, returns raw data without any processing.
+        pipeline_config : PipelineConfig, optional
+            Custom pipeline configuration. If None, uses default pipeline.
+        user_metadata : dict, optional
+            Optional metadata overrides with sections {"global": {...}, "variables": {...}}.
         **kwargs
             Additional reader-specific parameters. These are accepted but not used
             by the base class, allowing subclasses to define their own parameters
@@ -118,7 +130,17 @@ class AbstractReader(ABC):
         self._config_rename_variables = rename_variables
         self._config_assign_metadata = assign_metadata
         self._config_sort_variables = sort_variables
+        self._config_use_steps = use_steps
+        self._pipeline_config = pipeline_config
+        self._processing_metadata = None
+        self._postprocessed = False
+        self._user_metadata = normalize_user_metadata(user_metadata) if user_metadata else None
         # **kwargs is intentionally not stored - subclasses handle their own parameters
+        logger.info(
+            "Initialized reader %s for '%s'",
+            self.__class__.__name__,
+            self._input_file
+        )
 
     # =========================================================================
     # File Validation Methods (Override in subclasses for format-specific validation)
@@ -266,9 +288,9 @@ class AbstractReader(ABC):
         --------
         >>> class MyReader(AbstractReader):
         ...     def _load_data(self) -> xr.Dataset:
-        ...         # Read file and return Dataset
+        ...         # Read file and return raw Dataset
         ...         ds = xr.open_dataset(self.input_file)
-        ...         return self._perform_default_postprocessing(ds)
+        ...         return ds
         """
         raise NotImplementedError(
             f"{self.__class__.__name__} must implement _load_data() method. "
@@ -411,6 +433,9 @@ class AbstractReader(ABC):
         >>> ds = reader.data  # Re-read from file (lazy loading)
         """
         self._data = None
+        self._processing_metadata = None
+        self._postprocessed = False
+        logger.info("Reload requested for '%s'", self._input_file)
         return self
 
     def __enter__(self) -> 'AbstractReader':
@@ -428,6 +453,7 @@ class AbstractReader(ABC):
         ...     # process data
         >>> # data automatically released
         """
+        logger.debug("Entering reader context for '%s'", self._input_file)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
@@ -443,6 +469,7 @@ class AbstractReader(ABC):
             Traceback if an exception was raised.
         """
         self._data = None
+        logger.debug("Exiting reader context for '%s'", self._input_file)
 
     def __repr__(self) -> str:
         """String representation of the reader.
@@ -697,6 +724,12 @@ class AbstractReader(ABC):
         Perform default post-processing on the xarray Dataset.
         This includes renaming variables and assigning metadata.
 
+        Note
+        ----
+        This method is invoked automatically by the ``data`` property.
+        Reader subclasses should return raw datasets from ``_load_data()``
+        and must not call this method directly.
+
         Parameters
         ----------
         ds : xr.Dataset
@@ -708,29 +741,142 @@ class AbstractReader(ABC):
             The processed xarray Dataset.
         """
 
-        # Apply custom mapping of variable names if provided
-        if self._mapping is not None:
-            for key, value in self._mapping.items():
-                if value in ds.variables:
-                    ds = ds.rename({value: key})
+        # NEW: Use processing step pipeline if enabled (default)
+        if self._config_use_steps:
+            try:
+                from seasenselib.pipeline import default_pipeline, create_pipeline, PipelineConfig
+                
+                # Build metadata context
+                metadata = {
+                    'source_file': self._input_file,
+                    'format_name': self.format_name(),
+                    'reader_class': self.__class__.__name__,
+                    'reader_module': self.__class__.__module__,
+                    'reader_mapping': self._mapping,  # Pass reader mapping to stages
+                    'format_key': self.format_key(),  # Pass format key for format-specific mapping
+                }
+                if hasattr(self, "_raw_header") and getattr(self, "_raw_header"):
+                    metadata['raw_header'] = getattr(self, "_raw_header")
+                if self._user_metadata:
+                    metadata['user_metadata'] = self._user_metadata
+                
+                # Create pipeline (custom or default)
+                if self._pipeline_config is not None:
+                    if hasattr(self, "_fix_missing_coords"):
+                        if any(stage.name == "derivation" for stage in self._pipeline_config.pipeline):
+                            self._pipeline_config.upsert_stage('derivation', config={
+                                'depth': {
+                                    'use_default_latitude': bool(getattr(self, "_fix_missing_coords")),
+                                    'default_latitude': 45.0,
+                                }
+                            })
+                    pipeline = create_pipeline(config=self._pipeline_config)
+                else:
+                    # Create default pipeline profile with reader-specific config
+                    config = PipelineConfig.from_resource("default")
+                    
+                    # Get format-specific mappings from the reader class
+                    reader_mappings = self.format_mappings()
+                    
+                    # Configure mapping stage with reader mapping
+                    config.upsert_stage('mapping', config={
+                        'custom_mappings': self._mapping if self._mapping else {},
+                        'reader_mappings': reader_mappings if reader_mappings else {},
+                        'preserve_original': True
+                    })
 
-        # Rename variables according to default mappings
-        if self._config_rename_variables:
-            ds = self._rename_xarray_parameters(ds)
+                    if hasattr(self, "_fix_missing_coords"):
+                        config.upsert_stage('derivation', config={
+                            'depth': {
+                                'use_default_latitude': bool(getattr(self, "_fix_missing_coords")),
+                                'default_latitude': 45.0,
+                            }
+                        })
+                    
+                    pipeline = create_pipeline(config=config)
+                
+                # Track applied stages
+                metadata['stages_applied'] = pipeline.get_stage_order()
+                
+                # Execute pipeline
+                ds = pipeline.execute(ds, metadata)
 
-        # Assign metadata for all attributes of the xarray Dataset
-        if self._config_assign_metadata:
-            for key in (list(ds.data_vars.keys()) + list(ds.coords.keys())):
-                self._assign_metadata_for_key_to_xarray_dataset(ds, key)
+                # Store processing metadata for optional logging
+                self._processing_metadata = metadata
 
-        # Assign default global attributes
-        ds = self._assign_default_global_attributes(ds)
+                if self._user_metadata and not metadata.get('user_metadata_applied'):
+                    warning = (
+                        "User metadata was provided but not applied. "
+                        "Ensure the 'user_metadata' handler is enabled in the metadata_enrichment stage."
+                    )
+                    warnings.warn(warning)
+                    metadata.setdefault('warnings', []).append(warning)
 
-        # Sort variables and coordinates by name
-        if self._config_sort_variables:
-            ds = self._sort_xarray_variables(ds)
+                return ds
+                
+            except ImportError as e:
+                # Stages not available, fall back to legacy
+                warnings.warn(
+                    f"Stage system not available ({e}). "
+                    "Falling back to legacy postprocessing. "
+                    "This should not happen in normal operation.",
+                    RuntimeWarning
+                )
+                return ds
+        
+        # RAW MODE: When use_steps=False, return dataset as-is (no transformations)
+        # This is used for --raw-only CLI option to get original variable names from the file
+        else:
+            if self._user_metadata:
+                try:
+                    # Prevent user metadata from overriding RAW/provenance fields
+                    reserved_prefixes = ("raw_", "processor_")
+                    filtered = {"global": {}, "variables": {}}
+                    for key, value in self._user_metadata.get("global", {}).items():
+                        if key.startswith(reserved_prefixes):
+                            continue
+                        filtered["global"][key] = value
+                    for var_name, attrs in self._user_metadata.get("variables", {}).items():
+                        if isinstance(attrs, dict):
+                            new_attrs = {
+                                k: v for k, v in attrs.items()
+                                if not k.startswith(reserved_prefixes)
+                            }
+                            filtered["variables"][var_name] = new_attrs
+                        else:
+                            filtered["variables"][var_name] = attrs
+                    logger.debug("Applying user metadata in raw mode for '%s'", self._input_file)
+                    ds, _ = apply_user_metadata(ds, filtered, warn_missing=False)
+                except Exception as e:
+                    raise ValueError(f"Invalid user metadata: {e}") from e
+            return ds
+        
+        # Note: Legacy postprocessing code has been removed. All processing is handled
+        # by the pipeline system. If the pipeline import fails (which should never happen in normal
+        # operation), the code returns raw data above.
+        # 
+        # The legacy code did:
+        # - Variable name mapping --> now: variable_mapping step  
+        # - Metadata assignment --> now: cf_convention + metadata_extraction steps
+        # - Global attributes --> now: global_attributes step
+        # - Variable sorting --> now: sorting step
+        # 
+        # If old behavior needed, set use_steps=True (default) and use the processing pipeline.
 
+    def _postprocess_after_pipeline(self, ds: xr.Dataset) -> xr.Dataset:
+        """
+        Optional hook for reader-specific adjustments after the pipeline ran.
+
+        Override in subclasses if you need to apply small, format-specific
+        tweaks after the standard pipeline completes. The default implementation
+        returns the dataset unchanged.
+        """
         return ds
+
+    @property
+    def processing_metadata(self) -> Dict[str, Any] | None:
+        """Return processing metadata from the stage pipeline (if available)."""
+        return self._processing_metadata
 
     @property
     def data(self) -> xr.Dataset | None:
@@ -762,7 +908,14 @@ class AbstractReader(ABC):
         """
         if self._data is None:
             try:
+                logger.info("Loading data from '%s'", self._input_file)
                 self._data = self._load_data()
+                logger.debug(
+                    "Loaded dataset from '%s' with %d variables and %d coords",
+                    self._input_file,
+                    len(self._data.data_vars),
+                    len(self._data.coords)
+                )
             except NotImplementedError:
                 # Re-raise NotImplementedError with clear message
                 raise
@@ -770,6 +923,16 @@ class AbstractReader(ABC):
                 raise RuntimeError(
                     f"Failed to load data from {self._input_file}: {e}"
                 ) from e
+
+        if not self._postprocessed:
+            if self._config_perform_postprocessing:
+                logger.debug("Applying postprocessing pipeline for '%s'", self._input_file)
+                self._data = self._perform_default_postprocessing(self._data)
+                if self._processing_metadata is not None:
+                    self._data = self._postprocess_after_pipeline(self._data)
+            self._postprocessed = True
+        else:
+            logger.debug("Returning cached dataset for '%s'", self._input_file)
         return self._data
 
     def get_data(self) -> xr.Dataset | None:
@@ -851,3 +1014,42 @@ class AbstractReader(ABC):
             If the subclass does not implement this property.
         """
         raise NotImplementedError("Reader classes must define a file extension")
+    
+    @classmethod
+    def format_mappings(cls) -> Dict[str, list]:
+        """
+        Get format-specific variable name mappings for this reader.
+        
+        Returns format-specific mappings that extend or override the default 
+        mappings from parameters.py. This allows each reader to provide
+        sensor-specific variable name patterns without hard-coding them in stages.
+        
+        The stage system will use these mappings after user custom mappings
+        and before default mappings.
+        
+        Returns:
+        --------
+        dict
+            Dictionary mapping canonical parameter names to list of format-specific
+            variable name patterns. Empty dict means no format-specific mappings.
+            
+        Example:
+        --------
+        >>> class SbeCnvReader(AbstractReader):
+        ...     @classmethod
+        ...     def format_mappings(cls):
+        ...         import seasenselib.parameters as params
+        ...         return {
+        ...             params.TEMPERATURE: ['t090C', 't068', 'tv290C'],
+        ...             params.SALINITY: ['sal00', 'sal11'],
+        ...             params.CONDUCTIVITY: ['c0mS/cm', 'c0S/m']
+        ...         }
+        
+        Notes:
+        ------
+        - Override this method in subclasses to provide format-specific mappings
+        - Default implementation returns empty dict (no format-specific mappings)
+        - Keeps format-specific knowledge with the reader, not in stages
+        - Supports flexible, extensible architecture
+        """
+        return {}  # Default: no format-specific mappings

@@ -108,9 +108,6 @@ class RbrMatlabRsktoolsReader(AbstractReader):
             attrs=self._create_global_attributes()
         )
         
-        # Perform default post-processing
-        ds = self._perform_default_postprocessing(ds)
-
         return ds
     
     def _extract_metadata_from_rsk(self, rsk):
@@ -227,7 +224,7 @@ class RbrMatlabRsktoolsReader(AbstractReader):
     def _create_global_attributes(self) -> dict:
         """Extract global dataset attributes."""
         attrs = {
-            'Conventions': 'CF-1.8',
+            'Conventions': 'CF-1.13',
             'source': f"RBR {self._instrument_info.get('model', 'Unknown')}",
         }
 

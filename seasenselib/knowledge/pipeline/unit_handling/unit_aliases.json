@@ -1,0 +1,20 @@
+{
+  "ITS-90, deg C": "degC",
+  "degree_C": "degC",
+  "degree_Celsius": "degC",
+  "degrees_Celsius": "degC",
+  "degree_F": "degF",
+  "degree_Fahrenheit": "degF",
+  "degrees_Fahrenheit": "degF",
+  "deg F": "degF",
+  "degC": "degC",
+  "deg C": "degC",
+  "dbar": "decibar",
+  "S m-1": "S/m",
+  "mS cm-1": "mS/cm",
+  "m s-1": "m/s",
+  "meters": "meter",
+  "degrees": "degree",
+  "volts": "volt",
+  "1": "dimensionless"
+}

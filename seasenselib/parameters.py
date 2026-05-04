@@ -12,6 +12,8 @@ LATITUDE = 'latitude'
 LONGITUDE = 'longitude'
 DENSITY = 'density'
 POTENTIAL_TEMPERATURE = 'potential_temperature'
+CONSERVATIVE_TEMPERATURE = 'conservative_temperature'
+ABSOLUTE_SALINITY = 'absolute_salinity'
 SPEED_OF_SOUND = 'speed_of_sound'
 TIME_J = 'timeJ'  # Julian days offset
 TIME_Q = 'timeQ'  # Seconds since January 1, 2000
@@ -36,6 +38,7 @@ ROLL = 'roll'
 HEADING = 'heading'
 BATTERY_VOLTAGE = 'battery_voltage'
 ALTIMETER = 'altimeter'
+REDOX_POTENTIAL = 'redox_potential'
 
 # Meta data should use standardized values from https://cfconventions.org/
 metadata = {
@@ -100,6 +103,18 @@ metadata = {
         'long_name': 'Potential Temperature θ',
         'units': 'degC',
         'standard_name': 'sea_water_potential_temperature',
+        'measurement_type': 'Derived',
+    },
+    CONSERVATIVE_TEMPERATURE: {
+        'long_name': 'Conservative Temperature',
+        'units': 'degC',
+        'standard_name': 'sea_water_conservative_temperature',
+        'measurement_type': 'Derived',
+    },
+    ABSOLUTE_SALINITY: {
+        'long_name': 'Absolute Salinity',
+        'units': 'g kg-1',
+        'standard_name': 'sea_water_absolute_salinity',
         'measurement_type': 'Derived',
     },
     SPEED_OF_SOUND: {
@@ -311,15 +326,39 @@ rename_list = {
     'Soundspeed': SPEED_OF_SOUND
 }
 
+_ALLOWED_PARAMETERS_OVERRIDE = None
+
+# Load structured knowledge if available (preferred)
+try:
+    from .knowledge import load_json
+
+    metadata = load_json("pipeline/metadata_enrichment/parameters_metadata.json") or metadata
+    default_mappings = load_json("pipeline/mapping/mappings_default.json") or default_mappings
+    rename_list = load_json("pipeline/mapping/rename_list.json") or rename_list
+    _ALLOWED_PARAMETERS_OVERRIDE = load_json("pipeline/mapping/allowed_parameters.json")
+except Exception:
+    # Fallback to in-code defaults (used when resources are unavailable)
+    pass
+
+
 def allowed_parameters():
-    """Returns a dictionary of allowed parameter names with their descriptions."""
-    return {
-        TEMPERATURE: 'Temperature in degrees Celsius',
-        SALINITY: 'Salinity in PSU',
-        CONDUCTIVITY: 'Conductivity in S/m',
-        PRESSURE: 'Pressure in Dbar',
-        OXYGEN: 'Oxygen in micromoles/kg',
-        TURBIDITY: 'Turbidity in NTU',
-        DEPTH: 'Depth in meters',
-        DATE: 'Date of the measurement'
-    }
+    """Returns a dictionary of allowed parameter names with their descriptions.
+    
+    Returns all canonical parameter names that have mappings defined in default_mappings.
+    This represents the complete canonical parameter model.
+    """
+    if _ALLOWED_PARAMETERS_OVERRIDE is not None:
+        return _ALLOWED_PARAMETERS_OVERRIDE
+    
+    # Generate allowed parameters from all keys in default_mappings
+    # Use metadata for descriptions where available
+    result = {}
+    for param_name in default_mappings.keys():
+        if param_name in metadata:
+            # Use long_name from metadata as description
+            result[param_name] = metadata[param_name].get('long_name', param_name.replace('_', ' ').title())
+        else:
+            # Fallback: convert parameter name to readable description
+            result[param_name] = param_name.replace('_', ' ').title()
+    
+    return result

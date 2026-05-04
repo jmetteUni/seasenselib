@@ -95,8 +95,6 @@ class RbrAsciiReader(AbstractReader):
         ds = xr.Dataset.from_dataframe(df)
 
         # Perform default post-processing
-        ds = self._perform_default_postprocessing(ds)
-
         return ds
 
     def _parse_data(self, file_path) -> pd.DataFrame:

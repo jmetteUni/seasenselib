@@ -1,0 +1,244 @@
+{
+  "altimeter": [
+    "altM",
+    "altimeter",
+    "CTDALTIMETER",
+    "ctd_altimeter"
+  ],
+  "battery_voltage": [
+    "Vbatt",
+    "BATTV",
+    "battery voltage"
+  ],
+  "chlorophyll": [
+    "Chlorophyll",
+    "CLCON"
+  ],
+  "conductivity": [
+    "c0mS/cm",
+    "cond0mS/cm",
+    "c0",
+    "c0S/m",
+    "c1mS/cm",
+    "cond1mS/cm",
+    "c1",
+    "c1S/m",
+    "CON",
+    "COND",
+    "Conductivity",
+    "cond0",
+    "cond1",
+    "sea_water_electrical_conductivity"
+  ],
+  "density": [
+    "sigma-t00",
+    "sigma-t11",
+    "sigma-theta00",
+    "sigma-theta11",
+    "dens00",
+    "dens11",
+    "Density",
+    "density",
+    "SIGMA",
+    "Sigma",
+    "sigma",
+    "sea_water_density"
+  ],
+  "depth": [
+    "depSM",
+    "Depth",
+    "CTDDEPTH",
+    "ctd_depth",
+    "package_depth"
+  ],
+  "east_amplitude": [
+    "Amplitude (Beam1)",
+    "Eastward amplitude"
+  ],
+  "east_velocity": [
+    "east_velocity",
+    "eastward_velocity",
+    "eastward_sea_water_velocity",
+    "Velocity (Beam1|X|East)",
+    "Eastward velocity",
+    "eastward_sea_water_velocity"
+  ],
+  "heading": [
+    "Heading angle",
+    "heading_angle",
+    "platform_heading_angle"
+  ],
+  "fluorescence": [
+    "flECO-AFL",
+    "Fluorescence"
+  ],
+  "latitude": [
+    "latitude",
+    "LATITUDE",
+    "lat",
+    "LAT",
+    "Latitude",
+    "Lat"
+  ],
+  "longitude": [
+    "longitude",
+    "LONGITUDE",
+    "lon",
+    "LON",
+    "Longitude",
+    "Lon"
+  ],
+  "north_amplitude": [
+    "Amplitude (Beam2)",
+    "Northward amplitude"
+  ],
+  "north_velocity": [
+    "north_velocity",
+    "northward_velocity",
+    "northward_sea_water_velocity",
+    "Velocity (Beam2|Y|North)",
+    "Northward velocity",
+    "northward_sea_water_velocity"
+  ],
+  "oxygen": [
+    "oxsatMm/Kg",
+    "oxsolMm/Kg",
+    "sbeox0V",
+    "sbeox0",
+    "sbeox0ML/L",
+    "sbeox0Mm/Kg",
+    "sbeox0Mm/L",
+    "sbeox0PS",
+    "sbeox1V",
+    "sbeox1",
+    "sbeox1ML/L",
+    "sbeox1Mm/Kg",
+    "sbeox1Mm/L",
+    "sbeox1PS",
+    "Oxygen",
+    "O2",
+    "OXY",
+    "Dissolved O2",
+    "Dissolved Oxygen",
+    "Dissolved O2 Saturation",
+    "dissolved_o2_saturation",
+    "Dissolved O\u2082",
+    "Dissolved O\u2082 saturation",
+    "CTDOXY",
+    "ctd_oxygen",
+    "volume_fraction_of_oxygen_in_sea_water"
+  ],
+  "potential_temperature": [
+    "potemp090C",
+    "potemp190C",
+    "THETA",
+    "sea_water_potential_temperature"
+  ],
+  "power_supply_input": [
+    "Vbatt",
+    "Vcharge",
+    "Vmote"
+  ],
+  "pressure": [
+    "prdM",
+    "prDM",
+    "prSM",
+    "prM",
+    "pr",
+    "pr50M",
+    "pr50M1",
+    "pr200M",
+    "pr350M",
+    "pr600M",
+    "pr1000M",
+    "PRES",
+    "Pressure",
+    "Sea Pressure",
+    "Sea pressure",
+    "p",
+    "CTDPRS",
+    "sea_water_pressure"
+  ],
+  "roll": [
+    "Roll angle",
+    "roll_angle",
+    "platform_roll_angle"
+  ],
+  "salinity": [
+    "sal00",
+    "sal11",
+    "PSAL2",
+    "PSAL",
+    "SAL",
+    "Salinity",
+    "CTDSAL",
+    "ctd_salinity",
+    "sea_water_salinity"
+  ],
+  "speed_of_sound": [
+    "Soundspeed",
+    "Speed of Sound",
+    "speed_of_sound",
+    "speed_of_sound_in_sea_water"
+  ],
+  "temperature": [
+    "t090C",
+    "t068",
+    "t190C",
+    "t168",
+    "tv290C",
+    "TEMP",
+    "temp",
+    "Temp",
+    "Temperature",
+    "temperature",
+    "T1",
+    "T2",
+    "temp90",
+    "temp68",
+    "CTDTMP",
+    "ctd_temperature",
+    "ctd_temperature_68",
+    "sea_water_temperature",
+    "OTMP" 
+  ],
+  "timeJ": [
+    "timeJ",
+    "timeJV2",
+    "timeSCP"
+  ],
+  "timeN": [
+    "timeN"
+  ],
+  "timeQ": [
+    "timeQ",
+    "timeK"
+  ],
+  "timeS": [
+    "timeS"
+  ],
+  "turbidity": [
+    "turbWETntu0",
+    "Turbidity",
+    "Backscatter",
+    "sea_water_turbidity",
+    "TURB"
+  ],
+  "up_amplitude": [
+    "Amplitude (Beam3)",
+    "Upward amplitude"
+  ],
+  "up_velocity": [
+    "up_velocity",
+    "upward_velocity",
+    "upward_sea_water_velocity",
+    "Velocity (Beam3|Z|Up)",
+    "Upward velocity",
+    "upward_sea_water_velocity"
+  ],
+  "redox_potential": [
+    "EH",
+    "redox",
+    "Redox potential"
+  ]
+}
