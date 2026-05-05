@@ -213,7 +213,7 @@ For level-1 metadata, we recommend providing following global attributes in the 
 - `source`: The method of production of the original data. 
 - `platform`: The platform from which the data was collected.
 - `license`: The license under which the dataset is available.
-- `product_version': Version identifier of the data file or product as assigned by the data creator. 
+- `product_version`: Version identifier of the data file or product as assigned by the data creator. 
 - `references`: References to related publications or datasets.
 
 For recommended ACDD (Attribute Convention for Data Discovery 1-3) attributes, see: [https://wiki.esipfed.org/Attribute_Convention_for_Data_Discovery_1-3](https://wiki.esipfed.org/Attribute_Convention_for_Data_Discovery_1-3)
