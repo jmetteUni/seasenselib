@@ -5,6 +5,7 @@
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Docs](https://img.shields.io/badge/docs-sphinx-blue)](https://ocean-uhh.github.io/seasenselib/)
+[![CI - Test](https://github.com/ocean-uhh/seasenselib/actions/workflows/ci.yml/badge.svg)](https://github.com/ocean-uhh/seasenselib/actions/workflows/ci.yml)
 
 SeaSenseLib is a library for reading and standardizing different raw oceanographic sensor formats. It converts format-specific inputs (e.g. Sea-Bird cnv, RBR rsk) into CF/ACDD-compatible Level-1 netCDF files with canonical variable names, normalized units and preserved raw metadata. Processing is deterministic and applies no scientific interpretation or quality control. SeaSenseLib provides a pipeline model, a unified I/O layer, and optional plotting utilities.
 
