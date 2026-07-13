@@ -226,6 +226,7 @@ default_mappings = {
     CONDUCTIVITY: [
         'c0mS/cm', 'cond0mS/cm', 'c0', 'c0S/m', 
         'c1mS/cm', 'cond1mS/cm', 'c1', 'c1S/m',
+        'cond0S/m', 'cond1S/m',
         'COND', 'Conductivity',
         'cond0', 'cond1'
     ],

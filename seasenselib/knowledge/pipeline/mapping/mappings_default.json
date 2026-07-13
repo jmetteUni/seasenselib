@@ -17,6 +17,8 @@
   "conductivity": [
     "c0mS/cm",
     "cond0mS/cm",
+    "cond0S/m",
+    "cond1S/m",
     "c0",
     "c0S/m",
     "c1mS/cm",
