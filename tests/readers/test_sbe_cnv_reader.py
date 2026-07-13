@@ -59,6 +59,27 @@ def test_timek_is_used_for_time_coordinate_before_pipeline_mapping():
     assert reader._time_coordinate_source_type == "seconds_since_2000"
 
 
+def test_times_is_preferred_over_timeq_when_both_are_present():
+    data = {
+        "timeQ": np.array([831196801.0, 831196801.0, 831196802.0]),
+        "timeS": np.array([0.0, 0.5, 1.0]),
+    }
+
+    reader, coords = _calculate_time_coordinates(data)
+
+    expected = np.array(
+        [
+            "2026-05-04T08:00:01",
+            "2026-05-04T08:00:01.500000000",
+            "2026-05-04T08:00:02",
+        ],
+        dtype="datetime64[ns]",
+    )
+    np.testing.assert_array_equal(coords, expected)
+    assert reader._time_coordinate_source_name == "timeS"
+    assert reader._time_coordinate_source_type == "seconds_since_start_time"
+
+
 def test_interval_fallback_is_used_only_without_time_source_channel():
     data = {"temperature": np.arange(4)}
 

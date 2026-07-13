@@ -98,10 +98,13 @@ class SbeCnvReader(AbstractReader):
     _TIME_SOURCE_INTERVAL = "start_time_plus_interval"
 
     _TIME_SOURCE_CANDIDATES = (
-        (params.TIME_Q, _TIME_SOURCE_SECONDS_SINCE_2000),
-        (params.TIME_N, _TIME_SOURCE_SECONDS_SINCE_1970),
+        # Preserve the legacy CNV preference order: high-resolution elapsed
+        # scan time should win over coarser absolute time channels when both
+        # are present.
         (params.TIME_S, _TIME_SOURCE_SECONDS_SINCE_START),
         (params.TIME_J, _TIME_SOURCE_JULIAN_DAYS),
+        (params.TIME_Q, _TIME_SOURCE_SECONDS_SINCE_2000),
+        (params.TIME_N, _TIME_SOURCE_SECONDS_SINCE_1970),
     )
 
     _TIME_SOURCE_FALLBACK_ALIASES = {
