@@ -23,14 +23,13 @@ def _extract_date(date_string):
         "%Y-%m-%d %H:%M:%S",  # "2026-03-30 03:00:01"
     ]
 
-    timestamp = None
+    date_string = date_string.strip()
     for fmt in date_formats:
         try:
-            timestamp = datetime.strptime(date_string, fmt)
-            break
+            return datetime.strptime(date_string, fmt)
         except ValueError:
-            continue
-    return timestamp
+            pass
+    raise ValueError(f"Could not parse datetime string: {date_string!r}")
 
 
 class SbeAsciiReader(AbstractReader):
