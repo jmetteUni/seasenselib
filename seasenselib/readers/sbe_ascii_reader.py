@@ -14,8 +14,8 @@ import seasenselib.parameters as params
 
 logger = logging.getLogger(__name__)
 
-def _extract_date(date_string):
-    # Try multiple date formats
+def _extract_date(date_string: str) -> datetime:
+    """Parse a combined date/time string, supporting multiple SeaBird ASCII formats."""
     date_formats = [
         "%d %b %Y %H:%M:%S",  # "30 Mar 2026 03:00:01"
         "%m-%d-%Y %H:%M:%S",  # "03-30-2026 03:00:01"
