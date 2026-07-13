@@ -14,6 +14,24 @@ import seasenselib.parameters as params
 
 logger = logging.getLogger(__name__)
 
+def _extract_date(date_string: str) -> datetime:
+    """Parse a combined date/time string, supporting multiple SeaBird ASCII formats."""
+    date_formats = [
+        "%d %b %Y %H:%M:%S",  # "30 Mar 2026 03:00:01"
+        "%m-%d-%Y %H:%M:%S",  # "03-30-2026 03:00:01"
+        "%d-%m-%Y %H:%M:%S",  # "30-03-2026 03:00:01"
+        "%Y-%m-%d %H:%M:%S",  # "2026-03-30 03:00:01"
+    ]
+
+    date_string = date_string.strip()
+    for fmt in date_formats:
+        try:
+            return datetime.strptime(date_string, fmt)
+        except ValueError:
+            pass
+    raise ValueError(f"Could not parse datetime string: {date_string!r}")
+
+
 class SbeAsciiReader(AbstractReader):
     """Reads CTD data from a SeaBird ASCII file into an xarray Dataset."""
 
@@ -105,15 +123,15 @@ class SbeAsciiReader(AbstractReader):
         pressure_data = []  # Store pressure if available
 
         for line in lines[data_start:]:
-            parts = line.strip().split(', ')
+            parts = [p.strip() for p in line.split(",")]
 
             if len(parts) == 4:  # Case without pressure
                 temp, cond, date, time = parts
-                timestamp = datetime.strptime(f"{date} {time}", "%d %b %Y %H:%M:%S")
+                timestamp = _extract_date(f"{date} {time}")
                 data.append([float(temp), float(cond), timestamp])
             elif len(parts) == 5:  # Case with pressure
                 temp, cond, pres, date, time = parts
-                timestamp = datetime.strptime(f"{date} {time}", "%d %b %Y %H:%M:%S")
+                timestamp = _extract_date(f"{date} {time}")
                 pressure_data.append(float(pres))  # Store pressure data
                 data.append([float(temp), float(cond), timestamp])
 
