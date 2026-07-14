@@ -153,6 +153,14 @@ def _parse_user_metadata(args):
     return metadata
 
 
+def _build_writer_kwargs(args):
+    """Build writer kwargs from CLI arguments."""
+    writer_kwargs = {}
+    if getattr(args, "sanitize_netcdf_names", False):
+        writer_kwargs["sanitize_names"] = True
+    return writer_kwargs
+
+
 def _resolve_protocol_path(args, default_path: str) -> Path:
     """Resolve processing protocol path."""
     if isinstance(args.processing_protocol, str):
@@ -293,7 +301,8 @@ class ConvertCommand(BaseCommand):
                 raise ValidationError('No data found in file.')
 
             # Write data
-            self.io.write_data(data, args.output, args.output_format)
+            writer_kwargs = _build_writer_kwargs(args)
+            self.io.write_data(data, args.output, args.output_format, **writer_kwargs)
 
             # Write processing protocol if requested
             if want_protocol:
@@ -437,7 +446,13 @@ class SubsetCommand(BaseCommand):
 
             # Output or write
             if args.output:
-                self.io.write_data(subset, args.output, args.output_format)
+                writer_kwargs = _build_writer_kwargs(args)
+                self.io.write_data(
+                    subset,
+                    args.output,
+                    args.output_format,
+                    **writer_kwargs,
+                )
                 return CommandResult(success=True, message=f"Subset written to {args.output}")
             else:
                 print(subset)

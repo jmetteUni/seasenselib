@@ -28,8 +28,9 @@ class CsvWriter(AbstractWriter):
     __init__(data: xr.Dataset):
         Initializes the CsvWriter with the provided xarray Dataset.
     write(file_name: str, coordinate = params.TIME):
-        Writes the xarray Dataset to a CSV file with the specified file name and coordinate.
-        The coordinate parameter specifies which coordinate to use for selecting the data.
+        Writes the xarray Dataset to a CSV file with the specified file name.
+        The coordinate parameter is validated to exist in the dataset but does not
+        affect which data is written; the full dataset is always exported.
     file_extension: str
         The default file extension for this writer, which is '.csv'.
     """
@@ -42,17 +43,18 @@ class CsvWriter(AbstractWriter):
         file_name (str):
             The name of the output CSV file where the data will be saved.
         coordinate (str):
-            The coordinate to use for selecting the data. Default is params.TIME.
-            This should be a valid coordinate present in the xarray Dataset.
+            A coordinate or dimension that must be present in the dataset. Default is params.TIME.
+            This parameter is validated but does not affect the output; the full dataset
+            is always written to CSV.
         **kwargs:
             Additional keyword arguments (unused in this implementation).
         """
 
-        # Select the data corresponding to the specified coordinate
-        data = self.data.sel({coordinate: self.data[coordinate].values})
+        if coordinate not in self.data.coords and coordinate not in self.data.dims:
+            raise ValueError(f"Coordinate '{coordinate}' not found in the dataset.")
 
         # Convert the selected data to a pandas dataframe
-        df = data.to_dataframe()
+        df = self.data.to_dataframe()
 
         # Write the dataframe to the CSV file
         logger.info("Writing CSV file to '%s'", file_name)

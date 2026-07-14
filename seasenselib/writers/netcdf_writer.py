@@ -2,15 +2,137 @@
 Module for writing sensor data to netCDF files.
 """
 import logging
+from pathlib import Path
+import tempfile
+
+from seasenselib.core.exceptions import WriterError
 from seasenselib.writers.base import AbstractWriter
 
 logger = logging.getLogger(__name__)
 
+
+def _netcdf_name_with_slashes_replaced(name):
+    """Return a NetCDF-safe name by replacing slash separators."""
+    if isinstance(name, str) and "/" in name:
+        return name.replace("/", "_")
+    return name
+
+
+def _build_netcdf_name_map(ds) -> dict:
+    """Build a rename map for names containing slashes."""
+    names = []
+    seen = set()
+    for source_names in (ds.dims, ds.coords, ds.data_vars):
+        for name in source_names:
+            if name not in seen:
+                names.append(name)
+                seen.add(name)
+    final_names = {}
+    name_map = {}
+    for name in names:
+        safe_name = _netcdf_name_with_slashes_replaced(name)
+        previous_name = final_names.get(safe_name)
+        if previous_name is not None and previous_name != name:
+            raise WriterError(
+                "NetCDF name sanitization would create duplicate name "
+                f"'{safe_name}' from '{previous_name}' and '{name}'. "
+                "Please provide explicit variable mappings instead."
+            )
+
+        final_names[safe_name] = name
+        if safe_name != name:
+            name_map[name] = safe_name
+
+    return name_map
+
+
+def _validate_netcdf_names(ds):
+    """Raise a clear error when dataset names cannot be written to NetCDF."""
+    invalid_names = []
+
+    for kind, names in [
+        ("dimension", ds.dims),
+        ("coordinate", ds.coords),
+        ("variable", ds.data_vars),
+    ]:
+        for name in names:
+            if "/" in str(name):
+                invalid_names.append((kind, name))
+
+    if not invalid_names:
+        return
+
+    details = ", ".join(f"{kind} '{name}'" for kind, name in invalid_names)
+    raise WriterError(
+        "NetCDF output cannot be created because these names contain '/': "
+        f"{details}. NetCDF/HDF5 uses '/' as a group separator. Rename or map "
+        "these variables before writing, for example map 'cond0S/m' to "
+        "'conductivity'. Alternatively, pass sanitize_names=True (or "
+        "--sanitize-netcdf-names in the CLI) to replace '/' with '_' automatically."
+    )
+
+
+def _dataset_with_netcdf_safe_names(ds):
+    """Return a dataset with slash-containing names replaced by underscores."""
+    name_map = _build_netcdf_name_map(ds)
+    if not name_map:
+        return ds
+
+    renamed = ds.rename(name_map)
+    for original_name, safe_name in name_map.items():
+        if safe_name in renamed.data_vars or safe_name in renamed.coords:
+            renamed[safe_name].attrs.setdefault("original_name", str(original_name))
+    return renamed
+
+
+def _dataset_with_netcdf_safe_attrs(ds):
+    """Return a shallow dataset copy with NetCDF-compatible attributes."""
+
+    def clean_attr_value(value):
+        """Convert attribute values to NetCDF-compatible types."""
+        if isinstance(value, dict):
+            import json
+
+            return json.dumps(value)
+        if value is None:
+            return ""
+        if isinstance(value, (list, tuple)) and len(value) > 0:
+            try:
+                str(value)
+                return value
+            except (TypeError, ValueError):
+                import json
+
+                return json.dumps(list(value))
+        return value
+
+    safe = ds.copy(deep=False)
+    safe.attrs = {
+        attr_name: clean_attr_value(attr_value)
+        for attr_name, attr_value in ds.attrs.items()
+    }
+
+    for var_name, var in ds.data_vars.items():
+        safe[var_name].attrs = {
+            attr_name: clean_attr_value(attr_value)
+            for attr_name, attr_value in var.attrs.items()
+        }
+
+    for coord_name, coord in ds.coords.items():
+        safe[coord_name].attrs = {
+            attr_name: clean_attr_value(attr_value)
+            for attr_name, attr_value in coord.attrs.items()
+        }
+
+    return safe
+
+
 class NetCdfWriter(AbstractWriter):
     """ Writes sensor data from a xarray Dataset to a netCDF file. 
     
-    This class is used to save sensor data in a netCDF format, which is commonly used for
-    storing large datasets, especially in the field of oceanography and environmental science.
+    This class is used to save sensor data in a netCDF format, which is
+    commonly used for storing large datasets, especially in oceanography and
+    environmental science.
     The provided data is expected to be in an xarray Dataset format.
 
     Example usage:
@@ -32,53 +154,53 @@ class NetCdfWriter(AbstractWriter):
         The default file extension for this writer, which is '.nc'.
     """
 
-    def write(self, file_name: str, **kwargs):
+    def write(self, file_name: str, sanitize_names: bool = False, **kwargs):
         """ Writes the xarray Dataset to a netCDF file with the specified file name.
 
         Parameters:
         -----------
         file_name (str): 
             The name of the output netCDF file where the data will be saved.
+        sanitize_names : bool, optional
+            If True, replace slashes in NetCDF dimension, coordinate, and variable
+            names with underscores before writing.
         """
 
         ds = self.data
+        if sanitize_names:
+            ds = _dataset_with_netcdf_safe_names(ds)
+        else:
+            _validate_netcdf_names(ds)
+        safe_ds = _dataset_with_netcdf_safe_attrs(ds)
 
-        def clean_attr_value(value):
-            """Convert attribute values to NetCDF-compatible types"""
-            if isinstance(value, dict):
-                import json
-                return json.dumps(value)
-            elif value is None:
-                return ""  # Convert None to empty string
-            elif isinstance(value, (list, tuple)) and len(value) > 0:
-                # Check if list contains non-serializable items
-                try:
-                    # Test if it's already NetCDF compatible by trying to convert to string
-                    str(value)
-                    return value
-                except (TypeError, ValueError):
-                    import json
-                    return json.dumps(list(value))
-            else:
-                return value
+        output_path = Path(file_name)
+        output_dir = (
+            output_path.parent if output_path.parent != Path("") else Path(".")
+        )
+        output_dir.mkdir(parents=True, exist_ok=True)
+        temp_path = None
 
-        # Fix attributes at dataset level
-        for attr_name, attr_value in list(ds.attrs.items()):
-            ds.attrs[attr_name] = clean_attr_value(attr_value)
+        try:
+            with tempfile.NamedTemporaryFile(
+                delete=False,
+                dir=output_dir,
+                prefix=f".{output_path.name}.",
+                suffix=f".tmp{output_path.suffix or '.nc'}",
+            ) as temp_file:
+                temp_path = Path(temp_file.name)
 
-        # Fix attributes at variable level
-        for var_name, var in ds.data_vars.items():
-            for attr_name, attr_value in list(var.attrs.items()):
-                ds[var_name].attrs[attr_name] = clean_attr_value(attr_value)
-
-        # Fix attributes at coordinate level
-        for coord_name, coord in ds.coords.items():
-            for attr_name, attr_value in list(coord.attrs.items()):
-                ds[coord_name].attrs[attr_name] = clean_attr_value(attr_value)
-
-        logger.info("Writing netCDF file to '%s'", file_name)
-        ds.to_netcdf(file_name)
-        logger.info("Wrote netCDF file to '%s'", file_name)
+            logger.info("Writing temporary netCDF file to '%s'", temp_path)
+            safe_ds.to_netcdf(temp_path)
+            temp_path.replace(output_path)
+            logger.info("Wrote netCDF file to '%s'", output_path)
+        except Exception as exc:
+            if temp_path and temp_path.exists():
+                temp_path.unlink()
+            if isinstance(exc, WriterError):
+                raise
+            raise WriterError(
+                f"Could not write netCDF file '{file_name}': {exc}"
+            ) from exc
 
     @staticmethod
     def file_extension() -> str:
