@@ -1008,7 +1008,7 @@ def sbe37_hex_reader(
     ds.attrs["hex_layout_backend"] = layout.decoder_backend
     ds.attrs["hex_layout_expected_chars"] = layout.expected_hex_chars
     ds.attrs["hex_layout_fields"] = ", ".join(field.name for field in layout.fields)
-    ds.attrs["data_type"] = "calibrated"
+    ds.attrs["data_type"] = "calibrated" if (calibration_coeffs or xmlcon_info) else "raw"
 
     # Add sensor information as attributes
     if xmlcon_info:
