@@ -21,11 +21,12 @@ def _netcdf_name_with_slashes_replaced(name):
 def _build_netcdf_name_map(ds) -> dict:
     """Build a rename map for names containing slashes."""
     names = []
-    for source_names in [ds.dims, ds.coords, ds.data_vars]:
+    seen = set()
+    for source_names in (ds.dims, ds.coords, ds.data_vars):
         for name in source_names:
-            if name not in names:
+            if name not in seen:
                 names.append(name)
-
+                seen.add(name)
     final_names = {}
     name_map = {}
     for name in names:
