@@ -13,6 +13,10 @@ from seasenselib.readers.sbe_hex_reader import (
 )
 
 
+def _seabird_instrument_data():
+    return pytest.importorskip("seabirdscientific.instrument_data")
+
+
 def test_sbe_hex_reader_exposes_format_metadata():
     assert SbeHexReader.format_key() == "sbe-hex"
     assert SbeHexReader.format_name() == "SeaBird SBE37 HEX"
@@ -140,7 +144,7 @@ def test_parse_hex_header_sensors_detects_sensors_and_coefficients(tmp_path):
 
 
 def test_select_sbe37_instrument_type_from_header_and_override():
-    import seabirdscientific.instrument_data as id
+    id = _seabird_instrument_data()
 
     assert (
         _select_sbe37_instrument_type(id, device_type="SBE37SMP-ODO")
@@ -153,7 +157,7 @@ def test_select_sbe37_instrument_type_from_header_and_override():
 
 
 def test_detect_sbe_hex_layout_names_current_format0_temp_cond_layout():
-    import seabirdscientific.instrument_data as id
+    id = _seabird_instrument_data()
 
     layout = detect_sbe_hex_layout(
         {
@@ -176,7 +180,7 @@ def test_detect_sbe_hex_layout_names_current_format0_temp_cond_layout():
 
 
 def test_read_hex_file_fast_uses_seabird_line_decoder(tmp_path):
-    import seabirdscientific.instrument_data as id
+    id = _seabird_instrument_data()
 
     hex_file = tmp_path / "microcat.hex"
     hex_file.write_text(
@@ -203,7 +207,7 @@ def test_read_hex_file_fast_uses_seabird_line_decoder(tmp_path):
 
 
 def test_read_hex_file_fast_validates_detected_layout_length(tmp_path):
-    import seabirdscientific.instrument_data as id
+    id = _seabird_instrument_data()
 
     hex_file = tmp_path / "microcat.hex"
     hex_file.write_text(
