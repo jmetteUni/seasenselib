@@ -1,0 +1,235 @@
+from __future__ import annotations
+
+import numpy as np
+import pytest
+import xarray as xr
+
+from seasenselib.readers.sbe_hex_reader import (
+    SbeHexReader,
+    _read_hex_file_fast,
+    _select_sbe37_instrument_type,
+    detect_sbe_hex_layout,
+    parse_hex_header_sensors,
+)
+
+
+def _seabird_instrument_data():
+    return pytest.importorskip("seabirdscientific.instrument_data")
+
+
+def test_sbe_hex_reader_exposes_format_metadata():
+    assert SbeHexReader.format_key() == "sbe-hex"
+    assert SbeHexReader.format_name() == "SeaBird SBE37 HEX"
+    assert SbeHexReader.file_extension() == ".hex"
+    assert SbeHexReader._get_valid_extensions() == (".hex",)
+
+
+def test_sbe_hex_reader_loads_through_wrapped_function(tmp_path, monkeypatch):
+    hex_file = tmp_path / "microcat.hex"
+    hex_file.write_text("* header\n000000\n", encoding="utf-8")
+    expected = xr.Dataset(
+        {"temp": ("time", np.array([1.0, 2.0]))},
+        coords={
+            "time": np.array(
+                ["2024-01-01", "2024-01-02"], dtype="datetime64[ns]"
+            )
+        },
+    )
+    calls = []
+
+    def fake_sbe37_hex_reader(input_file, **kwargs):
+        calls.append((input_file, kwargs))
+        return expected
+
+    monkeypatch.setattr(
+        "seasenselib.readers.sbe_hex_reader.sbe37_hex_reader",
+        fake_sbe37_hex_reader,
+    )
+
+    reader = SbeHexReader(str(hex_file), perform_default_postprocessing=False)
+
+    assert reader.data is expected
+    assert calls == [
+        (
+            str(hex_file),
+            {
+                "instrument_type": None,
+                "moored_mode": False,
+                "is_shallow": True,
+                "frequency_channels_suppressed": 0,
+                "voltage_words_suppressed": 0,
+            },
+        )
+    ]
+
+
+def test_sbe_hex_reader_passes_decoder_options(tmp_path, monkeypatch):
+    hex_file = tmp_path / "microcat.hex"
+    hex_file.write_text("* header\n000000\n", encoding="utf-8")
+    expected = xr.Dataset(
+        {"temp": ("time", np.array([1.0]))},
+        coords={"time": np.array(["2024-01-01"], dtype="datetime64[ns]")},
+    )
+    calls = []
+
+    def fake_sbe37_hex_reader(input_file, **kwargs):
+        calls.append((input_file, kwargs))
+        return expected
+
+    monkeypatch.setattr(
+        "seasenselib.readers.sbe_hex_reader.sbe37_hex_reader",
+        fake_sbe37_hex_reader,
+    )
+
+    reader = SbeHexReader(
+        str(hex_file),
+        perform_default_postprocessing=False,
+        instrument_type="SBE37SMP",
+        moored_mode=True,
+    )
+
+    assert reader.data is expected
+    assert calls[0][1]["instrument_type"] == "SBE37SMP"
+    assert calls[0][1]["moored_mode"] is True
+
+
+def test_parse_hex_header_sensors_detects_sensors_and_coefficients(tmp_path):
+    hex_file = tmp_path / "microcat.hex"
+    hex_file.write_text(
+        "\n".join(
+            [
+                "*<Sensor id='Temperature'/>",
+                "*<Sensor id='Conductivity'/>",
+                "*<Sensor id='Pressure'/>",
+                '*<HardwareData DeviceType="SBE37SMP-ODO" SerialNumber="1">',
+                '*  <Sensor id="Oxygen"/>',
+                "*</HardwareData>",
+                "*<SampleLength>21</SampleLength>",
+                "*<TxRealTime>yes</TxRealTime>",
+                "*<CalibrationCoefficients>",
+                "*  <Calibration id='Temperature' format='TEMP'>",
+                "*    <A0>1.0</A0>",
+                "*    <A1>2.0</A1>",
+                "*  </Calibration>",
+                "*  <Calibration id='Conductivity' format='COND'>",
+                "*    <G>3.0</G>",
+                "*    <PCOR>4.0</PCOR>",
+                "*  </Calibration>",
+                "*</CalibrationCoefficients>",
+                "000000",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    info = parse_hex_header_sensors(hex_file)
+
+    assert info["enabled_sensors"] == [
+        "temperature",
+        "conductivity",
+        "pressure",
+        "oxygen",
+    ]
+    assert info["device_type"] == "SBE37SMP-ODO"
+    assert info["sample_length"] == 21
+    assert info["tx_real_time"] is True
+    assert (
+        info["calibration_coefficients"]["temperature"]["coefficients"]["a0"] == 1.0
+    )
+    assert info["calibration_coefficients"]["conductivity"]["coefficients"]["g"] == 3.0
+    assert (
+        info["calibration_coefficients"]["conductivity"]["coefficients"]["cpcor"]
+        == 4.0
+    )
+
+
+def test_select_sbe37_instrument_type_from_header_and_override():
+    id = _seabird_instrument_data()
+
+    assert (
+        _select_sbe37_instrument_type(id, device_type="SBE37SMP-ODO")
+        == id.InstrumentType.SBE37SMPODO
+    )
+    assert (
+        _select_sbe37_instrument_type(id, instrument_type="SBE37IMP")
+        == id.InstrumentType.SBE37IMP
+    )
+
+
+def test_detect_sbe_hex_layout_names_current_format0_temp_cond_layout():
+    id = _seabird_instrument_data()
+
+    layout = detect_sbe_hex_layout(
+        {
+            "device_type": "SBE37SM-RS232",
+            "sample_length": 10,
+            "tx_real_time": True,
+        },
+        ["temperature", "conductivity"],
+        id.InstrumentType.SBE37SM,
+    )
+
+    assert layout.name == "sbe37_format0_temp_cond_time"
+    assert layout.decoder_backend == "seabirdscientific.read_hex"
+    assert layout.expected_hex_chars == 20
+    assert [field.name for field in layout.fields] == [
+        "temperature",
+        "conductivity",
+        "date time",
+    ]
+
+
+def test_read_hex_file_fast_uses_seabird_line_decoder(tmp_path):
+    id = _seabird_instrument_data()
+
+    hex_file = tmp_path / "microcat.hex"
+    hex_file.write_text(
+        "\n".join(
+            [
+                "* header",
+                "*END*",
+                "03DA5C0A22C8318B0E81",
+                "03DA0C0A22C6318B0E90",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    raw = _read_hex_file_fast(
+        hex_file,
+        instrument_type=id.InstrumentType.SBE37SM,
+        enabled_sensors=[id.Sensors.Temperature, id.Sensors.Conductivity],
+    )
+
+    assert list(raw.columns) == ["temperature", "conductivity", "date time"]
+    assert len(raw) == 2
+    assert raw["temperature"].tolist() == [252508, 252428]
+
+
+def test_read_hex_file_fast_validates_detected_layout_length(tmp_path):
+    id = _seabird_instrument_data()
+
+    hex_file = tmp_path / "microcat.hex"
+    hex_file.write_text(
+        "\n".join(
+            [
+                "* header",
+                "*END*",
+                "03DA5C0A22C8318B0E8",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    layout = detect_sbe_hex_layout(
+        {"sample_length": 10, "tx_real_time": True},
+        ["temperature", "conductivity"],
+        id.InstrumentType.SBE37SM,
+    )
+
+    with pytest.raises(ValueError, match="sbe37_format0_temp_cond_time"):
+        _read_hex_file_fast(
+            hex_file,
+            instrument_type=id.InstrumentType.SBE37SM,
+            enabled_sensors=[id.Sensors.Temperature, id.Sensors.Conductivity],
+            layout=layout,
+        )
