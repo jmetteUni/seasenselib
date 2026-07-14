@@ -137,8 +137,12 @@ def load_nortek_csv_data(
 
     # Read CSV and parse time
     df = pd.read_csv(file_path, delimiter=";")
-    df["datetime"] = pd.to_datetime(df["dateTime"])
-    times = df["datetime"].values
+    if "dateTime" not in df.columns:
+        raise ValueError(
+            "Nortek CSV missing required 'dateTime' column; "
+            f"available columns: {', '.join(df.columns)}"
+        )
+    times = pd.to_datetime(df["dateTime"]).values
 
     # Extract data variables
     data_vars = _parse_nortek_csv_columns(df)
