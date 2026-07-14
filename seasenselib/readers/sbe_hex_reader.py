@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 import re
+from types import SimpleNamespace
 from typing import Dict, Union
 
 import numpy as np
@@ -20,34 +20,6 @@ _DEVICE_TYPE_RE = re.compile(r"\bDeviceType=(['\"])(?P<device_type>[^'\"]+)\1")
 _HEADER_VALUE_RE = re.compile(r"<(?P<tag>[A-Za-z0-9_]+)>(?P<value>.*?)</(?P=tag)>")
 
 
-@dataclass(frozen=True)
-class SbeHexField:
-    """One field inside a raw SBE hex data row."""
-
-    name: str
-    hex_chars: int
-
-
-@dataclass(frozen=True)
-class SbeHexLayout:
-    """Description of a supported raw SBE hex data-row layout.
-
-    This is intentionally small for now. Future layouts should be added by
-    creating another layout detector and, only if needed, another decoder
-    backend. The calibration/xarray building code should not need to know the
-    byte positions of each raw hex row.
-    """
-
-    name: str
-    instrument_family: str
-    decoder_backend: str
-    fields: tuple[SbeHexField, ...]
-
-    @property
-    def expected_hex_chars(self) -> int:
-        return sum(field.hex_chars for field in self.fields)
-
-
 _SBE37_FORMAT0_HEX_LENGTHS = {
     "temperature": 6,
     "conductivity": 6,
@@ -57,6 +29,34 @@ _SBE37_FORMAT0_HEX_LENGTHS = {
     "SBE63 oxygen temperature": 6,
     "date time": 8,
 }
+
+
+def _sbe_hex_field(name: str, hex_chars: int) -> SimpleNamespace:
+    """Create one field description inside a raw SBE hex data row."""
+    return SimpleNamespace(name=name, hex_chars=hex_chars)
+
+
+def _sbe_hex_layout(
+    *,
+    name: str,
+    instrument_family: str,
+    decoder_backend: str,
+    fields: tuple[SimpleNamespace, ...],
+) -> SimpleNamespace:
+    """Create a supported raw SBE hex data-row layout description.
+
+    This is intentionally small for now. Future layouts should be added by
+    creating another layout detector and, only if needed, another decoder
+    backend. The calibration/xarray building code should not need to know the
+    byte positions of each raw hex row.
+    """
+    return SimpleNamespace(
+        name=name,
+        instrument_family=instrument_family,
+        decoder_backend=decoder_backend,
+        fields=fields,
+        expected_hex_chars=sum(field.hex_chars for field in fields),
+    )
 
 
 def _is_sbe37_instrument_type(instrument_type) -> bool:
@@ -69,7 +69,7 @@ def detect_sbe_hex_layout(
     header_info: dict,
     enabled_sensors_list: list[str],
     instrument_type,
-) -> SbeHexLayout:
+) -> SimpleNamespace:
     """Detect the raw data-row layout before decoding.
 
     Only the SBE37 format-0 family is implemented so far because that is what
@@ -89,11 +89,11 @@ def detect_sbe_hex_layout(
         )
 
     fields = [
-        SbeHexField(
+        _sbe_hex_field(
             "temperature",
             _SBE37_FORMAT0_HEX_LENGTHS["temperature"],
         ),
-        SbeHexField(
+        _sbe_hex_field(
             "conductivity",
             _SBE37_FORMAT0_HEX_LENGTHS["conductivity"],
         ),
@@ -103,11 +103,11 @@ def detect_sbe_hex_layout(
     if "oxygen" in enabled_sensors_list:
         fields.extend(
             [
-                SbeHexField(
+                _sbe_hex_field(
                     "SBE63 oxygen phase",
                     _SBE37_FORMAT0_HEX_LENGTHS["SBE63 oxygen phase"],
                 ),
-                SbeHexField(
+                _sbe_hex_field(
                     "SBE63 oxygen temperature",
                     _SBE37_FORMAT0_HEX_LENGTHS["SBE63 oxygen temperature"],
                 ),
@@ -118,11 +118,11 @@ def detect_sbe_hex_layout(
     if "pressure" in enabled_sensors_list:
         fields.extend(
             [
-                SbeHexField(
+                _sbe_hex_field(
                     "pressure",
                     _SBE37_FORMAT0_HEX_LENGTHS["pressure"],
                 ),
-                SbeHexField(
+                _sbe_hex_field(
                     "temperature compensation",
                     _SBE37_FORMAT0_HEX_LENGTHS["temperature compensation"],
                 ),
@@ -131,10 +131,10 @@ def detect_sbe_hex_layout(
         layout_tokens.append("press")
 
     fields.append(
-        SbeHexField("date time", _SBE37_FORMAT0_HEX_LENGTHS["date time"])
+        _sbe_hex_field("date time", _SBE37_FORMAT0_HEX_LENGTHS["date time"])
     )
 
-    layout = SbeHexLayout(
+    layout = _sbe_hex_layout(
         name=f"sbe37_format0_{'_'.join(layout_tokens)}_time",
         instrument_family="SBE37",
         decoder_backend="seabirdscientific.read_hex",
@@ -240,7 +240,7 @@ def _read_hex_file_fast(
     filepath: Union[str, Path],
     instrument_type,
     enabled_sensors: list,
-    layout: SbeHexLayout | None = None,
+    layout: SimpleNamespace | None = None,
     *,
     moored_mode: bool = False,
     is_shallow: bool = True,
