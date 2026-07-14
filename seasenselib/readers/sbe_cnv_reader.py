@@ -91,6 +91,29 @@ class SbeCnvReader(AbstractReader):
     >>> reader = SbeCnvReader('data.cnv', sanitize_input=False)
     """
 
+    _TIME_SOURCE_SECONDS_SINCE_2000 = "seconds_since_2000"
+    _TIME_SOURCE_SECONDS_SINCE_1970 = "seconds_since_1970"
+    _TIME_SOURCE_SECONDS_SINCE_START = "seconds_since_start_time"
+    _TIME_SOURCE_JULIAN_DAYS = "julian_days"
+    _TIME_SOURCE_INTERVAL = "start_time_plus_interval"
+
+    _TIME_SOURCE_CANDIDATES = (
+        # Preserve the legacy CNV preference order: high-resolution elapsed
+        # scan time should win over coarser absolute time channels when both
+        # are present.
+        (params.TIME_S, _TIME_SOURCE_SECONDS_SINCE_START),
+        (params.TIME_J, _TIME_SOURCE_JULIAN_DAYS),
+        (params.TIME_Q, _TIME_SOURCE_SECONDS_SINCE_2000),
+        (params.TIME_N, _TIME_SOURCE_SECONDS_SINCE_1970),
+    )
+
+    _TIME_SOURCE_FALLBACK_ALIASES = {
+        params.TIME_Q: ("timeQ", "timeK"),
+        params.TIME_N: ("timeN",),
+        params.TIME_S: ("timeS",),
+        params.TIME_J: ("timeJ", "timeJV2", "timeSCP"),
+    }
+
     def __init__(self, input_file: str,
                  sanitize_input: bool = True,
                  fix_missing_coords: bool = True,
@@ -201,7 +224,47 @@ class SbeCnvReader(AbstractReader):
             logger.warning("Error normalizing time coordinates: %s", e)
             return time_coords
 
-    def __calculate_time_coordinates(self, xarray_data: dict, cnv: pycnv.pycnv, max_count: int) -> np.ndarray | None:
+    def __get_time_aliases(self, canonical_name: str) -> tuple[str, ...]:
+        """Return raw CNV names that should be interpreted as a time source."""
+        aliases = [canonical_name]
+        aliases.extend(params.default_mappings.get(canonical_name, []))
+        aliases.extend(self._TIME_SOURCE_FALLBACK_ALIASES.get(canonical_name, ()))
+        return tuple(dict.fromkeys(aliases))
+
+    def __find_time_source(
+        self,
+        xarray_data: dict,
+        canonical_name: str,
+    ) -> tuple[str | None, np.ndarray | None]:
+        """Find a raw time source by canonical name and known CNV aliases."""
+        aliases = self.__get_time_aliases(canonical_name)
+
+        for alias in aliases:
+            if alias in xarray_data:
+                return alias, xarray_data[alias]
+
+        lower_to_key = {key.lower(): key for key in xarray_data}
+        for alias in aliases:
+            key = lower_to_key.get(alias.lower())
+            if key is not None:
+                return key, xarray_data[key]
+
+        return None, None
+
+    def __set_time_coordinate_source(
+        self,
+        source_name: str | None,
+        source_type: str | None,
+    ) -> None:
+        self._time_coordinate_source_name = source_name
+        self._time_coordinate_source_type = source_type
+
+    def __calculate_time_coordinates(
+        self,
+        xarray_data: dict,
+        cnv: pycnv.pycnv,
+        max_count: int,
+    ) -> np.ndarray | None:
         """Calculate time coordinates from various time formats in CNV data.
 
         Parameters
@@ -236,30 +299,70 @@ class SbeCnvReader(AbstractReader):
                 offset_datetime = pd.to_datetime(f"{current_year}-01-01 00:00:00")
             logger.debug(f"Using cnv.date fallback: {offset_datetime}")
 
-        # Define the time coordinates as an array of datetime values
-        time_coords = None  # Initialize to avoid unbound variable error
-        
-        # Check for time variables (params match raw CNV names after mapping)
-        if params.TIME_S in xarray_data:
-            time_coords = np.array([TimeConverter.elapsed_seconds_since_offset_to_datetime(elapsed_seconds, offset_datetime) 
-                                   for elapsed_seconds in xarray_data[params.TIME_S]])
-        elif params.TIME_J in xarray_data:
-            year_startdate = datetime(year=offset_datetime.year, month=1, day=1)
-            time_coords = np.array([TimeConverter.julian_to_gregorian(jday, year_startdate) 
-                                    for jday in xarray_data[params.TIME_J]])
-        elif params.TIME_Q in xarray_data:
-            time_coords = np.array([TimeConverter.elapsed_seconds_since_jan_2000_to_datetime(elapsed_seconds) 
-                                    for elapsed_seconds in xarray_data[params.TIME_Q]])
-        elif params.TIME_N in xarray_data:
-            time_coords = np.array([TimeConverter.elapsed_seconds_since_jan_1970_to_datetime(elapsed_seconds) 
-                                    for elapsed_seconds in xarray_data[params.TIME_N]])
-        else:
+        self.__set_time_coordinate_source(None, None)
+
+        time_coords = None
+        for canonical_name, source_type in self._TIME_SOURCE_CANDIDATES:
+            source_name, values = self.__find_time_source(xarray_data, canonical_name)
+            if source_name is None or values is None:
+                continue
+
+            self.__set_time_coordinate_source(source_name, source_type)
+            if source_type == self._TIME_SOURCE_SECONDS_SINCE_2000:
+                time_coords = np.array([
+                    TimeConverter.elapsed_seconds_since_jan_2000_to_datetime(elapsed_seconds)
+                    for elapsed_seconds in values
+                ])
+            elif source_type == self._TIME_SOURCE_SECONDS_SINCE_1970:
+                time_coords = np.array([
+                    TimeConverter.elapsed_seconds_since_jan_1970_to_datetime(elapsed_seconds)
+                    for elapsed_seconds in values
+                ])
+            elif source_type == self._TIME_SOURCE_SECONDS_SINCE_START:
+                time_coords = np.array([
+                    TimeConverter.elapsed_seconds_since_offset_to_datetime(
+                        elapsed_seconds,
+                        offset_datetime,
+                    )
+                    for elapsed_seconds in values
+                ])
+            elif source_type == self._TIME_SOURCE_JULIAN_DAYS:
+                year_startdate = datetime(year=offset_datetime.year, month=1, day=1)
+                time_coords = np.array([
+                    TimeConverter.julian_to_gregorian(jday, year_startdate)
+                    for jday in values
+                ])
+            break
+
+        if time_coords is None:
             timedelta = self.__get_scan_interval_in_seconds(cnv.header)
             if timedelta:
-                time_coords = [offset_datetime + pd.Timedelta(seconds=i*timedelta) for i in range(max_count)][:]
+                self.__set_time_coordinate_source(
+                    "start_time + interval",
+                    self._TIME_SOURCE_INTERVAL,
+                )
+                time_coords = [
+                    offset_datetime + pd.Timedelta(seconds=i * timedelta)
+                    for i in range(max_count)
+                ][:]
 
         # Normalize time coordinates to ensure consistent format
         return self.__normalize_time_coords(time_coords)
+
+    def __assign_time_coordinate_metadata(self, ds):
+        """Record how the CNV time coordinate was derived."""
+        source_name = getattr(self, "_time_coordinate_source_name", None)
+        source_type = getattr(self, "_time_coordinate_source_type", None)
+        if source_name:
+            ds.attrs["cnv_time_source_variable"] = source_name
+        if source_type:
+            ds.attrs["cnv_time_source_type"] = source_type
+        if params.TIME in ds.coords:
+            if source_name:
+                ds[params.TIME].attrs.setdefault("source_variable", source_name)
+            if source_type:
+                ds[params.TIME].attrs.setdefault("source_type", source_type)
+        return ds
 
     def __assign_cnv_metadata(self, ds, xarray_labels, xarray_units, channel_names, cnv):
         """Assign CNV-specific metadata while preserving CF-compliant units when CNV units are missing.
@@ -745,6 +848,7 @@ class SbeCnvReader(AbstractReader):
 
         # Create xarray Dataset
         ds = self._get_xarray_dataset_template(time_coords, None, cnv.lat, cnv.lon)
+        ds = self.__assign_time_coordinate_metadata(ds)
 
         # Assign data to xarray Dataset
         for key in xarray_data.keys():
@@ -800,7 +904,7 @@ class SbeCnvReader(AbstractReader):
         return {
             params.TEMPERATURE: ['t090C', 't068', 't190C', 't168', 'tv290C'],
             params.SALINITY: ['sal00', 'sal11'],
-            params.CONDUCTIVITY: ['c0mS/cm', 'c0S/m', 'c1mS/cm', 'c1S/m', 'cond0mS/cm', 'cond1mS/cm'],
+            params.CONDUCTIVITY: ['c0mS/cm', 'c0S/m', 'c1mS/cm', 'c1S/m', 'cond0S/m', 'cond1S/m', 'cond0mS/cm', 'cond1mS/cm'],
             params.PRESSURE: ['prdM', 'prDM', 'prSM', 'prM', 'pr50M', 'pr200M', 'pr350M'],
             params.DEPTH: ['depSM'],
             params.OXYGEN: ['sbeox0V', 'sbeox0', 'sbeox0ML/L', 'sbeox0Mm/Kg', 'sbeox1V', 'sbeox1ML/L'],
