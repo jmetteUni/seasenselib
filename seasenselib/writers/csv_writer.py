@@ -29,7 +29,8 @@ class CsvWriter(AbstractWriter):
         Initializes the CsvWriter with the provided xarray Dataset.
     write(file_name: str, coordinate = params.TIME):
         Writes the xarray Dataset to a CSV file with the specified file name.
-        The coordinate parameter specifies the expected coordinate for tabular output.
+        The coordinate parameter is validated to exist in the dataset but does not
+        affect which data is written; the full dataset is always exported.
     file_extension: str
         The default file extension for this writer, which is '.csv'.
     """
@@ -42,8 +43,9 @@ class CsvWriter(AbstractWriter):
         file_name (str):
             The name of the output CSV file where the data will be saved.
         coordinate (str):
-            The expected coordinate for tabular output. Default is params.TIME.
-            This should be a valid coordinate present in the xarray Dataset.
+            A coordinate or dimension that must be present in the dataset. Default is params.TIME.
+            This parameter is validated but does not affect the output; the full dataset
+            is always written to CSV.
         **kwargs:
             Additional keyword arguments (unused in this implementation).
         """
