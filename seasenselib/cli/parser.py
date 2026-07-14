@@ -271,6 +271,18 @@ class ArgumentParser:
                     help='Inline metadata JSON (same structure as --metadata-file). '
                          'Variables should use canonical names.')
 
+    def _add_writer_config_args(self, parser):
+        """Add writer configuration arguments."""
+        parser.add_argument(
+            '--sanitize-netcdf-names',
+            action='store_true',
+            default=False,
+            help=(
+                "Replace '/' with '_' in NetCDF dimension, coordinate, and "
+                "variable names before writing."
+            ),
+        )
+
     def _add_logging_args(self, parser):
         """Add logging configuration arguments."""
         parser.add_argument('--verbose', action='store_true', default=False,
@@ -362,6 +374,7 @@ class ArgumentParser:
         convert_parser.add_argument('--processing-protocol', nargs='?', const=True, default=None,
                     help='Write a processing protocol (JSON) next to the output (optionally specify path)')
         self._add_reader_config_args(convert_parser)
+        self._add_writer_config_args(convert_parser)
         self._add_stage_control_args(convert_parser, lightweight=lightweight)
         self._add_logging_args(convert_parser)
         return convert_parser
@@ -538,6 +551,7 @@ class ArgumentParser:
         subset_parser.add_argument('--value-max', type=float, 
                     help='Maximum value for the specified parameter')
         self._add_reader_config_args(subset_parser)
+        self._add_writer_config_args(subset_parser)
         self._add_logging_args(subset_parser)
         return subset_parser
 
