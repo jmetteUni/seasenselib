@@ -66,8 +66,8 @@ def _validate_netcdf_names(ds):
         "NetCDF output cannot be created because these names contain '/': "
         f"{details}. NetCDF/HDF5 uses '/' as a group separator. Rename or map "
         "these variables before writing, for example map 'cond0S/m' to "
-        "'conductivity'. Alternatively, pass --sanitize-netcdf-names to replace "
-        "'/' with '_' automatically."
+        "'conductivity'. Alternatively, pass sanitize_names=True (or "
+        "--sanitize-netcdf-names in the CLI) to replace '/' with '_' automatically."
     )
 
 
