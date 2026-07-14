@@ -123,7 +123,7 @@ def load_nortek_csv_data(
     file_path : str or Path
         Path to the CSV data file (e.g., "Average Velocity DF3.csv")
     header_file : str, optional
-        Path to Units.csv file for metadata (optional)
+        Currently unused. Reserved for future parsing of AquaPro Units.csv metadata.
 
     Returns
     -------
