@@ -9,6 +9,7 @@ matplotlib
 netcdf4
 pint
 pyrsktools
+seabirdscientific>=1.2.0
 gsw
 setuptools
 build
