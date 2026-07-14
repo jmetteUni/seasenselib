@@ -638,7 +638,11 @@ def parse_hex_header_sensors(hex_file: Union[str, Path]) -> Dict:
                     }
 
     except Exception as e:
-        print(f"Warning: Could not parse calibration coefficients: {e}")
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "Could not parse calibration coefficients in %s: %s", hex_path, e
+        )
 
     return {
         "enabled_sensors": enabled_sensors,
