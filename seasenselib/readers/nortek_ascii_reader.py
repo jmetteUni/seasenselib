@@ -17,22 +17,16 @@ _VELOCITY_COLUMN_RE = re.compile(
 _AMPLITUDE_COLUMN_RE = re.compile(r"^Amplitude \(Beam(?P<beam>\d+)\)$")
 
 
-_VELOCITY_NAMES_BY_COORDINATE_SYSTEM = {
-    "BEAM": {
-        "1": "velocity_beam1",
-        "2": "velocity_beam2",
-        "3": "velocity_beam3",
-    },
-    "XYZ": {
-        "1": "x_velocity",
-        "2": "y_velocity",
-        "3": "z_velocity",
-    },
-    "ENU": {
-        "1": params.EAST_VELOCITY,
-        "2": params.NORTH_VELOCITY,
-        "3": params.UP_VELOCITY,
-    },
+_VELOCITY_AXIS_NAMES = {
+    "X": "x_velocity",
+    "Y": "y_velocity",
+    "Z": "z_velocity",
+}
+
+_VELOCITY_ENU_NAMES = {
+    "East": params.EAST_VELOCITY,
+    "North": params.NORTH_VELOCITY,
+    "Up": params.UP_VELOCITY,
 }
 
 _NORTEK_COLUMN_NAMES = {
@@ -283,12 +277,11 @@ class NortekAsciiReader(AbstractReader):
         """Map a Nortek header column to its coordinate-aware variable name."""
         velocity_match = _VELOCITY_COLUMN_RE.match(raw_name)
         if velocity_match:
-            beam = velocity_match.group("beam")
-            velocity_names = _VELOCITY_NAMES_BY_COORDINATE_SYSTEM.get(
-                coordinate_system,
-                _VELOCITY_NAMES_BY_COORDINATE_SYSTEM["BEAM"],
-            )
-            return velocity_names.get(beam, f"velocity_beam{beam}")
+            if coordinate_system == "XYZ":
+                return _VELOCITY_AXIS_NAMES[velocity_match.group("axis")]
+            if coordinate_system == "ENU":
+                return _VELOCITY_ENU_NAMES[velocity_match.group("enu")]
+            return f"velocity_beam{velocity_match.group('beam')}"
 
         amplitude_match = _AMPLITUDE_COLUMN_RE.match(raw_name)
         if amplitude_match:
