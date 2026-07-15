@@ -360,7 +360,9 @@ class NortekAsciiReader(AbstractReader):
             if column["unit"] != "unknown":
                 ds[variable].attrs["units"] = column["unit"]
 
-            if variable.startswith("velocity_") or variable.endswith("_velocity"):
+            if coordinate_system and (
+                variable.startswith("velocity_") or variable.endswith("_velocity")
+            ):
                 ds[variable].attrs["coordinate_system"] = coordinate_system
 
             if variable.startswith("amplitude_beam"):
