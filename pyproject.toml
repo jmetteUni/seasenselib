@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 
 name = "seasenselib"
-version = "0.5.0"
+version = "0.5.1"
 description = "Read, convert, and plot oceanographic sensor data."
 readme = "README.md"
 requires-python = ">=3.9"
