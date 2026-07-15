@@ -95,28 +95,48 @@ class RawMetadata:
                 logger.debug("Failed to compute raw file attributes: %s", exc)
 
         raw_header = metadata.get("raw_header")
+        raw_blocks = metadata.get("raw_metadata_blocks")
+        if not isinstance(raw_blocks, dict):
+            raw_blocks = {}
+        raw_variables = metadata.get("raw_metadata_variables")
+        if not isinstance(raw_variables, dict):
+            raw_variables = {}
 
         if "raw_metadata_schema" not in ds.attrs:
             ds.attrs["raw_metadata_schema"] = self.schema
+
+        blocks = {
+            "header": raw_header or None,
+            "attributes": None,
+            "calibration": None,
+            "configuration": None,
+            "other": None,
+        }
+        for block_name, block_value in raw_blocks.items():
+            if block_value is not None:
+                blocks[str(block_name)] = block_value
+
+        variables = dict(raw_variables)
+        if extracted_vars:
+            variables.update(extracted_vars)
 
         # Build RAW metadata container (opaque JSON)
         raw_container: Dict[str, Any] = {
             "schema": self.schema,
             "raw_format": raw_format or "",
             "raw_filename": raw_filename or "",
-            "blocks": {
-                "header": raw_header or None,
-                "calibration": None,
-                "configuration": None,
-                "other": None,
-            },
+            "blocks": blocks,
+            "variables": variables,
         }
 
-        if extracted_globals or extracted_vars:
-            raw_container["blocks"]["other"] = {
-                "global_attributes": extracted_globals,
-                "variables": extracted_vars,
-            }
+        if extracted_globals:
+            existing_other = raw_container["blocks"].get("other")
+            if not isinstance(existing_other, dict):
+                existing_other = {}
+            existing_globals = existing_other.get("global_attributes", {})
+            merged_other = dict(existing_other)
+            merged_other["global_attributes"] = {**existing_globals, **extracted_globals}
+            raw_container["blocks"]["other"] = merged_other
 
         if "raw_metadata" not in ds.attrs:
             try:

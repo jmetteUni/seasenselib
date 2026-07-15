@@ -56,6 +56,15 @@ def test_raw_metadata_moves_prefixes_and_sets_fields(tmp_path):
             "source_file": str(file_path),
             "format_key": "sbe-cnv",
             "raw_header": "* test\n*END*",
+            "raw_metadata_blocks": {
+                "attributes": {"instrument": "SBE"},
+            },
+            "raw_metadata_variables": {
+                "temperature": {
+                    "column_number": "1",
+                    "original_name": "t090C",
+                },
+            },
         },
     )
     handler = RawMetadata()
@@ -71,6 +80,9 @@ def test_raw_metadata_moves_prefixes_and_sets_fields(tmp_path):
 
     raw_meta = result.dataset.attrs["raw_metadata"]
     payload = __import__("json").loads(raw_meta)
+    assert payload["blocks"]["header"] == "* test\n*END*"
+    assert payload["blocks"]["attributes"] == {"instrument": "SBE"}
+    assert payload["variables"]["temperature"]["original_name"] == "t090C"
     assert payload["blocks"]["other"]["global_attributes"]["cnv_sbe_model"] == "SBE 9"
 
 

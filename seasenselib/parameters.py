@@ -273,24 +273,24 @@ default_mappings = {
     ],
     EAST_VELOCITY: [
         'east_velocity', 'eastward_velocity', 'eastward_sea_water_velocity',
-        'Velocity (Beam1|X|East)', 'Eastward velocity'
+        'Eastward velocity'
     ],
     NORTH_VELOCITY: [
         'north_velocity', 'northward_velocity', 'northward_sea_water_velocity',
-        'Velocity (Beam2|Y|North)', 'Northward velocity'
+        'Northward velocity'
     ],
     UP_VELOCITY: [
         'up_velocity', 'upward_velocity', 'upward_sea_water_velocity',
-        'Velocity (Beam3|Z|Up)', 'Upward velocity'
+        'Upward velocity'
     ],
     EAST_AMPLITUDE: [
-        'Amplitude (Beam1)', 'Eastward amplitude'
+        'Eastward amplitude'
     ],
     NORTH_AMPLITUDE: [
-        'Amplitude (Beam2)', 'Northward amplitude'
+        'Northward amplitude'
     ],
     UP_AMPLITUDE: [
-        'Amplitude (Beam3)', 'Upward amplitude'
+        'Upward amplitude'
     ],
     SPEED_OF_SOUND: [
         'Soundspeed', 'Speed of Sound', 'speed_of_sound'
@@ -314,12 +314,6 @@ default_mappings = {
 }
 
 rename_list = {
-    'Velocity (Beam1|X|East)': EAST_VELOCITY,
-    'Velocity (Beam2|Y|North)': NORTH_VELOCITY,
-    'Velocity (Beam3|Z|Up)': UP_VELOCITY,
-    'Amplitude (Beam1)': EAST_AMPLITUDE,
-    'Amplitude (Beam2)': NORTH_AMPLITUDE,
-    'Amplitude (Beam3)': UP_AMPLITUDE,
     'Temperature': TEMPERATURE,
     'Pressure': PRESSURE,
     'Temp': TEMPERATURE,
