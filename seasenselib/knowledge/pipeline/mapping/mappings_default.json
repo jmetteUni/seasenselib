@@ -54,14 +54,12 @@
     "package_depth"
   ],
   "east_amplitude": [
-    "Amplitude (Beam1)",
     "Eastward amplitude"
   ],
   "east_velocity": [
     "east_velocity",
     "eastward_velocity",
     "eastward_sea_water_velocity",
-    "Velocity (Beam1|X|East)",
     "Eastward velocity",
     "eastward_sea_water_velocity"
   ],
@@ -91,14 +89,12 @@
     "Lon"
   ],
   "north_amplitude": [
-    "Amplitude (Beam2)",
     "Northward amplitude"
   ],
   "north_velocity": [
     "north_velocity",
     "northward_velocity",
     "northward_sea_water_velocity",
-    "Velocity (Beam2|Y|North)",
     "Northward velocity",
     "northward_sea_water_velocity"
   ],
@@ -227,14 +223,12 @@
     "TURB"
   ],
   "up_amplitude": [
-    "Amplitude (Beam3)",
     "Upward amplitude"
   ],
   "up_velocity": [
     "up_velocity",
     "upward_velocity",
     "upward_sea_water_velocity",
-    "Velocity (Beam3|Z|Up)",
     "Upward velocity",
     "upward_sea_water_velocity"
   ],

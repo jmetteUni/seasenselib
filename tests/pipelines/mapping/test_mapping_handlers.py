@@ -1,5 +1,6 @@
 import xarray as xr
 
+import seasenselib.parameters as params
 from seasenselib.pipeline.base import StageContext
 from seasenselib.pipeline.mapping.handlers.dict_mapping_strategy import DictMappingStrategy
 from seasenselib.pipeline.mapping.handlers.regex_mapping_strategy import RegexMappingStrategy
@@ -96,3 +97,35 @@ def test_mapping_runner_no_mappings_leaves_dataset():
 
     assert list(result.dataset.data_vars) == ["tempA"]
     assert "variable_mappings" not in result.metadata
+
+
+def test_default_mapping_does_not_assume_nortek_velocity_coordinate_system():
+    raw_nortek_names = [
+        "Velocity (Beam1|X|East)",
+        "Velocity (Beam2|Y|North)",
+        "Velocity (Beam3|Z|Up)",
+        "Amplitude (Beam1)",
+        "Amplitude (Beam2)",
+        "Amplitude (Beam3)",
+    ]
+    ds = xr.Dataset({name: (["time"], [1.0, 2.0]) for name in raw_nortek_names})
+    runner = MappingRunner(
+        use_custom_mappings=False,
+        use_reader_mappings=False,
+        use_default_mappings=True,
+        use_regex=False,
+    )
+
+    result = runner.process(StageContext(ds, {}))
+
+    assert set(raw_nortek_names).issubset(result.dataset.data_vars)
+    assert not {
+        "east_velocity",
+        "north_velocity",
+        "up_velocity",
+        "east_amplitude",
+        "north_amplitude",
+        "up_amplitude",
+    }.intersection(result.dataset.data_vars)
+    for raw_name in raw_nortek_names:
+        assert raw_name not in params.rename_list

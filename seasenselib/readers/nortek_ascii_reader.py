@@ -3,11 +3,59 @@ Module for reading Nortek ASCII data files into xarray Datasets.
 """
 
 from __future__ import annotations
+from pathlib import Path
 import re
 import pandas as pd
 import xarray as xr
 import seasenselib.parameters as params
 from .base import AbstractReader
+
+
+_VELOCITY_COLUMN_RE = re.compile(
+    r"^Velocity \(Beam(?P<beam>\d+)\|(?P<axis>[XYZ])\|(?P<enu>East|North|Up)\)$"
+)
+_AMPLITUDE_COLUMN_RE = re.compile(r"^Amplitude \(Beam(?P<beam>\d+)\)$")
+
+
+_VELOCITY_NAMES_BY_COORDINATE_SYSTEM = {
+    "BEAM": {
+        "1": "velocity_beam1",
+        "2": "velocity_beam2",
+        "3": "velocity_beam3",
+    },
+    "XYZ": {
+        "1": "x_velocity",
+        "2": "y_velocity",
+        "3": "z_velocity",
+    },
+    "ENU": {
+        "1": params.EAST_VELOCITY,
+        "2": params.NORTH_VELOCITY,
+        "3": params.UP_VELOCITY,
+    },
+}
+
+_NORTEK_COLUMN_NAMES = {
+    "Month": "month",
+    "Day": "day",
+    "Year": "year",
+    "Hour": "hour",
+    "Minute": "minute",
+    "Second": "second",
+    "Error code": "error_code",
+    "Status code": "status_code",
+    "Battery voltage": params.BATTERY_VOLTAGE,
+    "Soundspeed": params.SPEED_OF_SOUND,
+    "Soundspeed used": "speed_of_sound_used",
+    "Heading": params.HEADING,
+    "Pitch": params.PITCH,
+    "Roll": params.ROLL,
+    "Temperature": params.TEMPERATURE,
+    "Analog input 1": "analog_input_1",
+    "Analog input 2": "analog_input_2",
+    "Speed": params.MAGNITUDE,
+    "Direction": params.DIRECTION,
+}
 
 
 class NortekAsciiReader(AbstractReader):
@@ -71,6 +119,9 @@ class NortekAsciiReader(AbstractReader):
                 Whether to sort variables alphabetically.
         """
         super().__init__(dat_file_path, mapping, input_header_file=header_file_path, **kwargs)
+        self._nortek_header_settings = {}
+        self._raw_metadata_blocks = {}
+        self._raw_metadata_variables = {}
         self._validate_file()
 
     @classmethod
@@ -83,9 +134,36 @@ class NortekAsciiReader(AbstractReader):
         """ASCII formats can have various extensions, so warn only."""
         return False
 
-    def _read_header(self, hdr_file_path):
-        """Reads the .hdr file to extract column names and units."""
+    def _read_header_settings(self, hdr_file_path):
+        """Reads the .hdr file to extract instrument settings."""
+        settings = {}
+        with open(hdr_file_path, 'r') as file:
+            for line in file:
+                if line.strip() == "Data file format":
+                    break
+
+                match = re.match(
+                    r"^(?P<key>[A-Za-z][A-Za-z0-9 /_-]*?)\s{2,}(?P<value>.*)$",
+                    line.rstrip(),
+                )
+                if not match:
+                    continue
+
+                key = match.group("key").strip().lower().replace(" ", "_")
+                settings[key] = match.group("value").strip()
+
+        coordinate_system = settings.get("coordinate_system")
+        if coordinate_system:
+            settings["coordinate_system"] = coordinate_system.upper()
+
+        return settings
+
+    def _read_header(self, hdr_file_path, dat_file_path=None):
+        """Reads the .hdr file to extract data-file column names and units."""
         headers = []
+        blocks = []
+        current_block = None
+
         with open(hdr_file_path, 'r') as file:
             capture = False
             for line in file:
@@ -93,71 +171,200 @@ class NortekAsciiReader(AbstractReader):
                     capture = True
                     continue
                 if capture:
-                    if line.strip() == '':
-                        break
-                    if line.strip() and not line.startswith('---') and not line.startswith('['):
-                        # Use regex to split the line considering whitespace count
-                        parts = re.split(r'\s{2,}', line.strip())
+                    stripped = line.strip()
+                    if not stripped or stripped.startswith('---'):
+                        continue
 
-                        if len(parts) >= 2:
-                            col_number = parts[0]
-                            if parts[-1].startswith('(') and parts[-1].endswith(')'):
-                                unit = parts[-1].strip('()')
-                                col_name = ' '.join(parts[1:-1])
-                            else:
-                                unit = 'unknown'
-                                col_name = ' '.join(parts[1:])
-                        else:
-                            # Fallback if no unit is provided and the line is not correctly parsed
-                            col_number = parts[0].split()[0]
-                            col_name = ' '.join(parts[0].split()[1:])
-                            unit = 'unknown'
+                    if stripped.startswith('[') and stripped.endswith(']'):
+                        current_block = {
+                            "file_path": stripped[1:-1],
+                            "headers": [],
+                        }
+                        blocks.append(current_block)
+                        continue
 
-                        headers.append((col_number, col_name, unit))
+                    if current_block is None:
+                        continue
+
+                    header = self._parse_header_column_line(stripped)
+                    if header is not None:
+                        current_block["headers"].append(header)
+
+        if blocks:
+            selected_block = self._select_data_format_block(blocks, dat_file_path)
+            headers = selected_block["headers"]
+
         return headers
 
-    def _parse_data(self, dat_file_path, headers):
-        """Parses the .dat file using headers information."""
-        columns = [name for _, name, _ in headers]  # Extract just the names from headers
+    def _parse_header_column_line(self, line):
+        """Parse one numbered Nortek data-format column line."""
+        match = re.match(
+            r"^(?P<number>\d+)\s+(?P<body>.*?)(?:\s+\((?P<unit>[^()]*)\))?$",
+            line,
+        )
+        if not match:
+            return None
 
-        # Handle duplicate column names by making them unique
-        unique_columns = []
+        col_number = match.group("number")
+        col_name = match.group("body").strip()
+        unit = match.group("unit") or "unknown"
+        return (col_number, col_name, unit)
+
+    def _select_data_format_block(self, blocks, dat_file_path=None):
+        """Select the header block that describes the requested data file."""
+        if not blocks:
+            raise ValueError("No data-file format block found in Nortek header.")
+
+        if dat_file_path is None:
+            return blocks[0]
+
+        data_path = Path(dat_file_path)
+        data_name = data_path.name.lower()
+        data_suffix = data_path.suffix.lower()
+
+        for block in blocks:
+            block_name = Path(block["file_path"].replace("\\", "/")).name.lower()
+            if block_name == data_name:
+                return block
+
+        for block in blocks:
+            block_name = Path(block["file_path"].replace("\\", "/")).name.lower()
+            if Path(block_name).suffix.lower() == data_suffix:
+                return block
+
+        return blocks[0]
+
+    def _normalise_header_columns(self, headers, settings):
+        """Build unique dataset column definitions from Nortek header columns."""
+        coordinate_system = settings.get("coordinate_system", "BEAM")
+        columns = []
+
+        for column_number, raw_name, unit in headers:
+            variable_name = self._normalise_column_name(
+                raw_name,
+                unit,
+                coordinate_system,
+            )
+            columns.append(
+                {
+                    "column_number": column_number,
+                    "raw_name": raw_name,
+                    "variable_name": variable_name,
+                    "unit": unit,
+                }
+            )
+
         seen = {}
-        for col in columns:
-            if col in seen:
-                seen[col] += 1
-                col = f"{col}_{seen[col]}"
+        for column in columns:
+            variable_name = column["variable_name"]
+            if variable_name in seen:
+                seen[variable_name] += 1
+                column["variable_name"] = f"{variable_name}_{seen[variable_name]}"
             else:
-                seen[col] = 0
-            unique_columns.append(col)
+                seen[variable_name] = 0
 
-        data = pd.read_csv(dat_file_path, sep=r'\s+', names=unique_columns)
+        return columns
+
+    def _raw_variable_metadata(self, columns):
+        """Build raw metadata for variables parsed from the Nortek header."""
+        variables = {}
+        for column in columns:
+            variable_name = column["variable_name"]
+            metadata = {
+                "column_number": column["column_number"],
+                "original_name": column["raw_name"],
+            }
+            if column["unit"] != "unknown":
+                metadata["units"] = column["unit"]
+            variables[variable_name] = metadata
+        return variables
+
+    def _normalise_column_name(self, raw_name, unit, coordinate_system):
+        """Map a Nortek header column to its coordinate-aware variable name."""
+        velocity_match = _VELOCITY_COLUMN_RE.match(raw_name)
+        if velocity_match:
+            beam = velocity_match.group("beam")
+            velocity_names = _VELOCITY_NAMES_BY_COORDINATE_SYSTEM.get(
+                coordinate_system,
+                _VELOCITY_NAMES_BY_COORDINATE_SYSTEM["BEAM"],
+            )
+            return velocity_names.get(beam, f"velocity_beam{beam}")
+
+        amplitude_match = _AMPLITUDE_COLUMN_RE.match(raw_name)
+        if amplitude_match:
+            return f"amplitude_beam{amplitude_match.group('beam')}"
+
+        if raw_name == "Pressure":
+            normalised_unit = unit.strip().lower()
+            if normalised_unit in {"m", "meter", "meters"}:
+                return params.DEPTH
+            return params.PRESSURE
+
+        if raw_name in _NORTEK_COLUMN_NAMES:
+            return _NORTEK_COLUMN_NAMES[raw_name]
+
+        return re.sub(r"[^0-9A-Za-z]+", "_", raw_name.strip()).strip("_").lower()
+
+    def _parse_data(self, dat_file_path, columns):
+        """Parses the .dat file using headers information."""
+        column_names = [column["variable_name"] for column in columns]
+        self._validate_data_column_count(dat_file_path, column_names)
+        data = pd.read_csv(dat_file_path, sep=r'\s+', names=column_names)
         return data
 
-    def _create_xarray_dataset(self, df, headers):
+    def _validate_data_column_count(self, dat_file_path, column_names):
+        """Ensure the selected header block matches the data file columns."""
+        with open(dat_file_path, "r") as data_file:
+            for line_number, line in enumerate(data_file, start=1):
+                fields = line.split()
+                if not fields:
+                    continue
+                if len(fields) != len(column_names):
+                    raise ValueError(
+                        f"Nortek data line {line_number} has {len(fields)} "
+                        f"columns, but the selected header block defines "
+                        f"{len(column_names)} columns."
+                    )
+                return
+
+    def _create_xarray_dataset(self, df, columns, settings):
         """Converts the DataFrame to an xarray Dataset, renaming columns and assigning units."""
         # Convert columns to datetime
-        df['time'] = pd.to_datetime(df[['Year', 'Month', 'Day', 'Hour', 'Minute', 'Second']])
+        df['time'] = pd.to_datetime(
+            {
+                "year": df["year"],
+                "month": df["month"],
+                "day": df["day"],
+                "hour": df["hour"],
+                "minute": df["minute"],
+                "second": df["second"],
+            }
+        )
 
         # Set datetime as the index
         df.set_index('time', inplace=True)
 
-        # Rename columns as specified
-        df.rename(columns=params.rename_list, inplace=True)
-
         # Convert the DataFrame to an xarray Dataset
         ds = xr.Dataset.from_dataframe(df)
 
-        # Renaming and CF meta data enrichment
-        for header in headers:
-            _, variable, unit = header
+        coordinate_system = settings.get("coordinate_system")
+        if coordinate_system:
+            ds.attrs["coordinate_system"] = coordinate_system
 
-            # Rename
-            if variable in params.rename_list.keys():
-                variable = params.rename_list[variable]
+        for column in columns:
+            variable = column["variable_name"]
+            if variable not in ds:
+                continue
 
-            # Set unit
-            ds[variable].attrs['unit'] = unit
+            ds[variable].attrs["original_name"] = column["raw_name"]
+            if column["unit"] != "unknown":
+                ds[variable].attrs["units"] = column["unit"]
+
+            if variable.startswith("velocity_") or variable.endswith("_velocity"):
+                ds[variable].attrs["coordinate_system"] = coordinate_system
+
+            if variable.startswith("amplitude_beam"):
+                ds[variable].attrs["coordinate_system"] = "BEAM"
 
         # Assign meta information for all attributes of the xarray Dataset
         for key in (list(ds.data_vars.keys()) + list(ds.coords.keys())):
@@ -173,9 +380,21 @@ class NortekAsciiReader(AbstractReader):
         xr.Dataset
             The loaded dataset.
         """
-        headers = self._read_header(self.input_header_file)
-        data = self._parse_data(self.input_file, headers)
-        ds = self._create_xarray_dataset(data, headers)
+        settings = self._read_header_settings(self.input_header_file)
+        self._nortek_header_settings = settings
+        headers = self._read_header(self.input_header_file, self.input_file)
+        columns = self._normalise_header_columns(headers, settings)
+        self._raw_metadata_blocks = {"attributes": settings}
+        self._raw_metadata_variables = self._raw_variable_metadata(columns)
+        data = self._parse_data(self.input_file, columns)
+        ds = self._create_xarray_dataset(data, columns, settings)
+        return ds
+
+    def _postprocess_after_pipeline(self, ds: xr.Dataset) -> xr.Dataset:
+        """Restore Nortek-specific metadata after the generic pipeline."""
+        coordinate_system = self._nortek_header_settings.get("coordinate_system")
+        if coordinate_system:
+            ds.attrs["coordinate_system"] = coordinate_system
         return ds
 
     @classmethod
@@ -199,12 +418,6 @@ class NortekAsciiReader(AbstractReader):
             variable name patterns commonly found in ASCII export files.
         """
         return {
-            params.EAST_VELOCITY: ['Velocity (Beam1|X|East)', 'Eastward velocity'],
-            params.NORTH_VELOCITY: ['Velocity (Beam2|Y|North)', 'Northward velocity'],
-            params.UP_VELOCITY: ['Velocity (Beam3|Z|Up)', 'Upward velocity'],
-            params.EAST_AMPLITUDE: ['Amplitude (Beam1)', 'Eastward amplitude'],
-            params.NORTH_AMPLITUDE: ['Amplitude (Beam2)', 'Northward amplitude'],
-            params.UP_AMPLITUDE: ['Amplitude (Beam3)', 'Upward amplitude'],
             params.SPEED_OF_SOUND: ['Soundspeed', 'Speed of Sound'],
             params.PRESSURE: ['Pressure'],
             params.TEMPERATURE: ['Temperature'],

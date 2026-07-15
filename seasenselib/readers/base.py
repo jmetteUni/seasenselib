@@ -757,6 +757,10 @@ class AbstractReader(ABC):
                 }
                 if hasattr(self, "_raw_header") and getattr(self, "_raw_header"):
                     metadata['raw_header'] = getattr(self, "_raw_header")
+                if hasattr(self, "_raw_metadata_blocks") and getattr(self, "_raw_metadata_blocks"):
+                    metadata['raw_metadata_blocks'] = getattr(self, "_raw_metadata_blocks")
+                if hasattr(self, "_raw_metadata_variables") and getattr(self, "_raw_metadata_variables"):
+                    metadata['raw_metadata_variables'] = getattr(self, "_raw_metadata_variables")
                 if self._user_metadata:
                     metadata['user_metadata'] = self._user_metadata
                 
