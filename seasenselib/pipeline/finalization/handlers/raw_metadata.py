@@ -130,8 +130,12 @@ class RawMetadata:
         }
 
         if extracted_globals:
+            existing_other = raw_container["blocks"].get("other") or {}
+            existing_globals = existing_other.get("global_attributes", {}) if isinstance(existing_other, dict) else {}
+            merged_globals = {**existing_globals, **extracted_globals}
             raw_container["blocks"]["other"] = {
-                "global_attributes": extracted_globals,
+                **({k: v for k, v in existing_other.items() if k != "global_attributes"} if isinstance(existing_other, dict) else {}),
+                "global_attributes": merged_globals,
             }
 
         if "raw_metadata" not in ds.attrs:
