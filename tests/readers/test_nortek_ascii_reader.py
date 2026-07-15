@@ -63,6 +63,29 @@ def _write_nortek_ascii_pair(tmp_path, coordinate_system="BEAM"):
     return dat_file, hdr_file
 
 
+def _write_nortek_ascii_pair_with_custom_velocity_labels(
+    tmp_path,
+    coordinate_system,
+    velocity_labels,
+):
+    dat_file, hdr_file = _write_nortek_ascii_pair(tmp_path, coordinate_system)
+    text = hdr_file.read_text(encoding="utf-8")
+    text = text.replace(
+        "Velocity (Beam1|X|East)",
+        velocity_labels[0],
+    )
+    text = text.replace(
+        "Velocity (Beam2|Y|North)",
+        velocity_labels[1],
+    )
+    text = text.replace(
+        "Velocity (Beam3|Z|Up)",
+        velocity_labels[2],
+    )
+    hdr_file.write_text(text, encoding="utf-8")
+    return dat_file, hdr_file
+
+
 @pytest.mark.parametrize(
     ("coordinate_system", "expected_velocity_names"),
     [
@@ -91,6 +114,50 @@ def test_nortek_ascii_velocity_names_follow_coordinate_system(
     assert not {"east_velocity", "north_velocity", "up_velocity"}.issubset(
         ds.data_vars
     ) or coordinate_system == "ENU"
+
+
+def test_nortek_ascii_velocity_names_use_matching_label_component(tmp_path):
+    dat_file, hdr_file = _write_nortek_ascii_pair_with_custom_velocity_labels(
+        tmp_path,
+        "ENU",
+        [
+            "Velocity (Beam7|Z|Up)",
+            "Velocity (Beam2|X|East)",
+            "Velocity (Beam9|Y|North)",
+        ],
+    )
+
+    ds = NortekAsciiReader(
+        str(dat_file),
+        str(hdr_file),
+        perform_default_postprocessing=False,
+    ).data
+
+    assert {"east_velocity", "north_velocity", "up_velocity"}.issubset(
+        ds.data_vars
+    )
+    assert "velocity_beam7" not in ds.data_vars
+    assert ds["up_velocity"].attrs["original_name"] == "Velocity (Beam7|Z|Up)"
+
+    dat_file, hdr_file = _write_nortek_ascii_pair_with_custom_velocity_labels(
+        tmp_path,
+        "XYZ",
+        [
+            "Velocity (Beam7|Z|Up)",
+            "Velocity (Beam2|X|East)",
+            "Velocity (Beam9|Y|North)",
+        ],
+    )
+
+    ds = NortekAsciiReader(
+        str(dat_file),
+        str(hdr_file),
+        perform_default_postprocessing=False,
+    ).data
+
+    assert {"x_velocity", "y_velocity", "z_velocity"}.issubset(ds.data_vars)
+    assert "velocity_beam7" not in ds.data_vars
+    assert ds["z_velocity"].attrs["original_name"] == "Velocity (Beam7|Z|Up)"
 
 
 def test_nortek_ascii_amplitude_is_always_beam_and_pressure_m_is_depth(tmp_path):
