@@ -20,7 +20,7 @@ def _parse_start_end(s: str) -> np.datetime64:
     ):
         try:
             return np.datetime64(datetime.strptime(str(s), fmt))
-        except Exception:
+        except (ValueError, TypeError):
             continue
     raise ValueError(f"Could not parse date string: {s}")
 
