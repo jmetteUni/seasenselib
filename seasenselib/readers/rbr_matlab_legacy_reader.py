@@ -35,7 +35,7 @@ def _parse_time_any(s: str) -> pd.Timestamp:
     ):
         try:
             return pd.to_datetime(str(s), format=fmt)
-        except Exception:
+        except (ValueError, TypeError):
             continue
 
     result = pd.to_datetime(str(s), dayfirst=False, errors="coerce")
