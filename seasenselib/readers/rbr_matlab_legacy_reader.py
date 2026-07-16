@@ -10,6 +10,40 @@ from datetime import datetime
 from seasenselib.readers.base import AbstractReader
 
 
+def _parse_start_end(s: str) -> np.datetime64:
+    """Parse start/end date from string, supporting multiple formats."""
+    for fmt in (
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d %H:%M:%S.%f",
+        "%d/%m/%Y %I:%M:%S %p",
+        "%d/%m/%Y %I:%M:%S.%f %p",
+    ):
+        try:
+            return np.datetime64(datetime.strptime(str(s), fmt))
+        except (ValueError, TypeError):
+            continue
+    raise ValueError(f"Could not parse date string: {s}")
+
+
+def _parse_time_any(s: str) -> pd.Timestamp:
+    """Parse RBR sample time strings without swapping ISO day/month fields."""
+    for fmt in (
+        "%Y-%m-%d %H:%M:%S.%f",
+        "%Y-%m-%d %H:%M:%S",
+        "%d/%m/%Y %I:%M:%S.%f %p",
+        "%d/%m/%Y %I:%M:%S %p",
+    ):
+        try:
+            return pd.to_datetime(str(s), format=fmt)
+        except (ValueError, TypeError):
+            continue
+
+    result = pd.to_datetime(str(s), dayfirst=False, errors="coerce")
+    if pd.isna(result):
+        raise ValueError(f"Could not parse time string: {s}")
+    return result
+
+
 class RbrMatlabLegacyReader(AbstractReader):
     """Reader which converts RBR data stored in MATLAB .mat files into an xarray Dataset."""
 
@@ -96,23 +130,6 @@ class RbrMatlabLegacyReader(AbstractReader):
         except Exception:
             self._serial_number = None
 
-        # Start / end times as numpy datetime64
-
-        def _parse_start_end(s: str) -> np.datetime64:
-            """Parse start/end date from string, supporting multiple formats."""
-            # Try legacy format first
-            try:
-                return np.datetime64(datetime.strptime(s, "%d/%m/%Y %I:%M:%S %p"))
-            except Exception:
-                pass
-            # Try ISO format fallback
-            try:
-                return np.datetime64(datetime.strptime(s, "%Y-%m-%d %H:%M:%S"))
-            except Exception:
-                pass
-            # If all fails, raise error
-            raise ValueError(f"Could not parse date string: {s}")
-
         self._start_date = _parse_start_end(RBR.starttime)
         self._end_date   = _parse_start_end(RBR.endtime)
 
@@ -132,19 +149,6 @@ class RbrMatlabLegacyReader(AbstractReader):
         # ---- sample times (cell array of strings) → datetime64 ----
         # Examples like: '12/08/2018 12:00:00.000 PM' or without milliseconds
         raw_times = np.atleast_1d(RBR.sampletimes)
-
-        def _parse_time_any(s: str) -> pd.Timestamp:
-            # try with milliseconds, then without
-            for fmt in ("%d/%m/%Y %I:%M:%S.%f %p", "%d/%m/%Y %I:%M:%S %p"):
-                try:
-                    return pd.to_datetime(s, format=fmt, dayfirst=True)
-                except Exception:
-                    continue
-            # robust fallback
-            result = pd.to_datetime(s, dayfirst=True, errors="coerce")
-            if pd.isna(result):
-                raise ValueError(f"Could not parse time string: {s}")
-            return result
 
         times = pd.to_datetime([_parse_time_any(str(s)) for s in raw_times])
         if times.isna().any():
