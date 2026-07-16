@@ -27,7 +27,7 @@ def test_rbr_legacy_time_parser_prefers_iso_dates():
 
 
 def test_rbr_legacy_reader_preserves_iso_sampletimes(tmp_path):
-    scipy_io = pytest.importorskip("scipy.io")
+    import scipy.io as scipy_io
     mat_file = tmp_path / "rbr_legacy_iso.mat"
     scipy_io.savemat(
         mat_file,
