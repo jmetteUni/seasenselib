@@ -36,10 +36,11 @@ def _parse_reader_arg_value(value: str):
 def _build_reader_kwargs(args):
     """Build reader kwargs from CLI arguments."""
     reader_kwargs = {
-        'sanitize_input': not getattr(args, "no_sanitize", False),
-        'fix_missing_coords': not getattr(args, "no_fix_coords", False)
+        "sanitize_input": True,
+        "fix_missing_coords": True,
     }
 
+    # Parse generic reader args
     for item in getattr(args, "reader_args", None) or []:
         if "=" not in item:
             raise ValidationError(
@@ -52,6 +53,12 @@ def _build_reader_kwargs(args):
                 f"Invalid reader argument name: {name!r}."
             )
         reader_kwargs[name] = _parse_reader_arg_value(value)
+
+    # Apply explicit flags last so they always win on conflicts
+    if getattr(args, "no_sanitize", False):
+        reader_kwargs["sanitize_input"] = False
+    if getattr(args, "no_fix_coords", False):
+        reader_kwargs["fix_missing_coords"] = False
 
     return reader_kwargs
 
