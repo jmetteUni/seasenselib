@@ -5,6 +5,7 @@ Plotting commands (plot, plot-ts, plot-profile, plot-series).
 import argparse
 from ...core.exceptions import ValidationError
 from .base import BaseCommand, CommandResult
+from .data_commands import _build_reader_kwargs
 
 
 class PlotCommand(BaseCommand):
@@ -44,10 +45,7 @@ class PlotCommand(BaseCommand):
                 )
             
             # Read data with reader-specific kwargs
-            reader_kwargs = {
-                'sanitize_input': not args.no_sanitize,
-                'fix_missing_coords': not args.no_fix_coords
-            }
+            reader_kwargs = _build_reader_kwargs(args)
             data = self.io.read_data(
                 args.input, 
                 args.input_format, 
@@ -89,7 +87,10 @@ class PlotCommand(BaseCommand):
         args_dict = vars(args)
         
         # Skip internal/common arguments that aren't for the plotter
-        skip_args = {'plotter', 'input', 'input_format', 'header_input', 'command', 'list_plotters'}
+        skip_args = {
+            'plotter', 'input', 'input_format', 'header_input', 'command',
+            'list_plotters', 'no_sanitize', 'no_fix_coords', 'reader_args'
+        }
         
         for key, value in args_dict.items():
             if key in skip_args or value is None:

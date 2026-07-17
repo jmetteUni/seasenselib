@@ -12,6 +12,57 @@ from .base import BaseCommand, CommandResult
 
 logger = logging.getLogger(__name__)
 
+
+def _parse_reader_arg_value(value: str):
+    """Parse simple CLI reader option values into useful Python types."""
+    value = value.strip()
+    lower = value.lower()
+
+    if lower in {"true", "yes", "on"}:
+        return True
+    if lower in {"false", "no", "off"}:
+        return False
+    if lower in {"none", "null"}:
+        return None
+
+    try:
+        if any(char in value for char in ".eE"):
+            return float(value)
+        return int(value)
+    except ValueError:
+        return value
+
+
+def _build_reader_kwargs(args):
+    """Build reader kwargs from CLI arguments."""
+    reader_kwargs = {
+        "sanitize_input": True,
+        "fix_missing_coords": True,
+    }
+
+    # Parse generic reader args
+    for item in getattr(args, "reader_args", None) or []:
+        if "=" not in item:
+            raise ValidationError(
+                f"Invalid reader argument: {item}. Use NAME=VALUE."
+            )
+        name, value = item.split("=", 1)
+        name = name.strip().replace("-", "_")
+        if not name or not name.isidentifier():
+            raise ValidationError(
+                f"Invalid reader argument name: {name!r}."
+            )
+        reader_kwargs[name] = _parse_reader_arg_value(value)
+
+    # Apply explicit flags last so they always win on conflicts
+    if getattr(args, "no_sanitize", False):
+        reader_kwargs["sanitize_input"] = False
+    if getattr(args, "no_fix_coords", False):
+        reader_kwargs["fix_missing_coords"] = False
+
+    return reader_kwargs
+
+
 def _build_stage_kwargs(args):
     """Build processing stage kwargs from CLI arguments.
     
@@ -213,6 +264,7 @@ def _write_processing_protocol(
         "pipeline_apply_handlers": getattr(args, "pipeline_apply_handlers", None),
         "pipeline_skip_handlers": getattr(args, "pipeline_skip_handlers", None),
         "raw_only": getattr(args, "raw_only", False),
+        "reader_args": getattr(args, "reader_args", None),
     }
 
     if metadata:
@@ -274,10 +326,7 @@ class ConvertCommand(BaseCommand):
                     mapping_dict[original] = canonical
 
             # Read data with reader-specific kwargs
-            reader_kwargs = {
-                'sanitize_input': not getattr(args, "no_sanitize", False),
-                'fix_missing_coords': not getattr(args, "no_fix_coords", False)
-            }
+            reader_kwargs = _build_reader_kwargs(args)
             # Add mapping if provided
             if mapping_dict:
                 reader_kwargs['mapping'] = mapping_dict
@@ -350,10 +399,7 @@ class ShowCommand(BaseCommand):
                     mapping_dict[original] = canonical
 
             # Read data with reader-specific kwargs
-            reader_kwargs = {
-                'sanitize_input': not getattr(args, "no_sanitize", False),
-                'fix_missing_coords': not getattr(args, "no_fix_coords", False)
-            }
+            reader_kwargs = _build_reader_kwargs(args)
             # Add mapping if provided
             if mapping_dict:
                 reader_kwargs['mapping'] = mapping_dict
@@ -410,10 +456,7 @@ class SubsetCommand(BaseCommand):
             from ...processors import SubsetProcessor
 
             # Read data with reader-specific kwargs
-            reader_kwargs = {
-                'sanitize_input': not getattr(args, "no_sanitize", False),
-                'fix_missing_coords': not getattr(args, "no_fix_coords", False)
-            }
+            reader_kwargs = _build_reader_kwargs(args)
             user_metadata = _parse_user_metadata(args)
             if user_metadata:
                 reader_kwargs['user_metadata'] = user_metadata
@@ -472,10 +515,7 @@ class CalcCommand(BaseCommand):
             from ...processors import ResampleProcessor, StatisticsProcessor
             
             # Read data with reader-specific kwargs
-            reader_kwargs = {
-                'sanitize_input': not getattr(args, "no_sanitize", False),
-                'fix_missing_coords': not getattr(args, "no_fix_coords", False)
-            }
+            reader_kwargs = _build_reader_kwargs(args)
             user_metadata = _parse_user_metadata(args)
             if user_metadata:
                 reader_kwargs['user_metadata'] = user_metadata
