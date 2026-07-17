@@ -182,6 +182,9 @@ class ArgumentParser:
                     help='Disable automatic file format fixes (stricter parsing)')
         parser.add_argument('--no-fix-coords', action='store_true', default=False,
                     help='Disable automatic coordinate defaults (require explicit lat/lon)')
+        parser.add_argument('--reader-arg', action='append', default=[],
+                    metavar='NAME=VALUE', dest='reader_args',
+                    help='Pass a reader-specific option. Can be repeated, e.g. --reader-arg latitude=30.0')
         
         # Try to let the plotter class declare its own CLI args (plugins supported)
         try:
@@ -265,6 +268,9 @@ class ArgumentParser:
                     help='Disable automatic file format fixes (stricter parsing)')
         parser.add_argument('--no-fix-coords', action='store_true', default=False,
                     help='Disable automatic coordinate defaults (require explicit lat/lon)')
+        parser.add_argument('--reader-arg', action='append', default=[],
+                    metavar='NAME=VALUE', dest='reader_args',
+                    help='Pass a reader-specific option. Can be repeated, e.g. --reader-arg latitude=30.0')
         parser.add_argument('--metadata-file', type=str,
                     help='Path to a metadata JSON file with sections "global" and "variables"')
         parser.add_argument('--metadata', type=str,
