@@ -449,7 +449,8 @@ def _build_nortek_csv_columns(
             if cell > 1:
                 variable_name = f"{variable_name}_cell{cell}"
             long_name = f"Amplitude Beam {beam}"
-        else:
+            if cell > 1:
+                long_name = f"{long_name} Cell {cell}"
             variable_name = f"correlation_beam{beam}"
             if cell > 1:
                 variable_name = f"{variable_name}_cell{cell}"
