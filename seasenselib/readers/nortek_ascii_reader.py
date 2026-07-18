@@ -131,10 +131,26 @@ class NortekAsciiReader(AbstractReader):
     def _read_header_settings(self, hdr_file_path):
         """Reads the .hdr file to extract instrument settings."""
         settings = {}
+        matrix_keys = {
+            "transformation_matrix",
+            "magnetometer_calibration_matrix",
+        }
+        current_matrix_key = None
         with open(hdr_file_path, 'r') as file:
             for line in file:
                 if line.strip() == "Data file format":
                     break
+
+                stripped = line.strip()
+                if current_matrix_key and stripped and line[:1].isspace():
+                    values = self._parse_numeric_values(stripped)
+                    if values:
+                        settings[current_matrix_key].append(values)
+                        if len(settings[current_matrix_key]) >= 3:
+                            current_matrix_key = None
+                        continue
+                if current_matrix_key and stripped:
+                    current_matrix_key = None
 
                 match = re.match(
                     r"^(?P<key>[A-Za-z][A-Za-z0-9 /_-]*?)\s{2,}(?P<value>.*)$",
@@ -143,14 +159,60 @@ class NortekAsciiReader(AbstractReader):
                 if not match:
                     continue
 
+                current_matrix_key = None
                 key = match.group("key").strip().lower().replace(" ", "_")
-                settings[key] = match.group("value").strip()
+                value = match.group("value").strip()
+                if key in matrix_keys:
+                    settings[key] = [self._parse_numeric_values(value)]
+                    current_matrix_key = key
+                elif key == "compass_hard_iron_calibration":
+                    settings[key] = self._parse_numeric_values(value)
+                else:
+                    settings[key] = value
 
         coordinate_system = settings.get("coordinate_system")
         if coordinate_system:
             settings["coordinate_system"] = coordinate_system.upper()
 
         return settings
+
+    def _parse_numeric_values(self, value):
+        """Parse a whitespace-separated row of numeric Nortek metadata."""
+        values = []
+        for item in value.split():
+            try:
+                if any(char in item for char in ".eE"):
+                    values.append(float(item))
+                else:
+                    values.append(int(item))
+            except ValueError:
+                values.append(item)
+        return values
+
+    def _calibration_from_header_settings(self, settings):
+        """Extract structured calibration metadata from parsed header settings."""
+        calibration = {}
+        for key in self._calibration_setting_keys():
+            if settings.get(key):
+                calibration[key] = settings[key]
+        return calibration
+
+    def _header_attributes_for_raw_metadata(self, settings):
+        """Return header attributes without duplicated calibration entries."""
+        calibration_keys = set(self._calibration_setting_keys())
+        return {
+            key: value
+            for key, value in settings.items()
+            if key not in calibration_keys
+        }
+
+    def _calibration_setting_keys(self):
+        """Return parsed header-setting keys that belong to calibration."""
+        return (
+            "transformation_matrix",
+            "magnetometer_calibration_matrix",
+            "compass_hard_iron_calibration",
+        )
 
     def _read_header(self, hdr_file_path, dat_file_path=None):
         """Reads the .hdr file to extract data-file column names and units."""
@@ -379,7 +441,12 @@ class NortekAsciiReader(AbstractReader):
         self._nortek_header_settings = settings
         headers = self._read_header(self.input_header_file, self.input_file)
         columns = self._normalise_header_columns(headers, settings)
-        self._raw_metadata_blocks = {"attributes": settings}
+        self._raw_metadata_blocks = {
+            "attributes": self._header_attributes_for_raw_metadata(settings)
+        }
+        calibration = self._calibration_from_header_settings(settings)
+        if calibration:
+            self._raw_metadata_blocks["calibration"] = calibration
         self._raw_metadata_variables = self._raw_variable_metadata(columns)
         data = self._parse_data(self.input_file, columns)
         ds = self._create_xarray_dataset(data, columns, settings)
