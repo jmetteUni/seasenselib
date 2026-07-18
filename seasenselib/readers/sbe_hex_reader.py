@@ -1177,6 +1177,8 @@ def sbe37_hex_reader(
     if xmlcon_info:
         if xmlcon_path is not None:
             ds.attrs["xmlcon_file"] = str(xmlcon_path)
+        else:
+            ds.attrs["sensor_detection"] = "xmlcon"
     else:
         ds.attrs["sensor_detection"] = "hex_header"
     if device_type:
