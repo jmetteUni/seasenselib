@@ -36,7 +36,7 @@ from typing import Any
 _loaded_modules = {}
 
 # Version info
-__version__ = "0.3.0"
+__version__ = "0.5.1"
 
 def __getattr__(name: str) -> Any:
     """
