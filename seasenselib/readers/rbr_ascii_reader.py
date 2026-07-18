@@ -315,11 +315,14 @@ class RbrAsciiReader(AbstractReader):
 
     def _normalise_table_columns(self, table_columns, channels):
         """Build unique dataset column definitions from table and channel metadata."""
-        ordered_channels = [channels[key] for key in sorted(channels)]
+        ordered_channel_numbers = sorted(channels)
         columns = []
 
         for index, raw_name in enumerate(table_columns):
-            channel = ordered_channels[index] if index < len(ordered_channels) else {}
+            channel_number = (
+                ordered_channel_numbers[index] if index < len(ordered_channel_numbers) else None
+            )
+            channel = channels.get(channel_number, {}) if channel_number is not None else {}
             channel_name = channel.get("name")
             columns.append(
                 {
@@ -327,7 +330,7 @@ class RbrAsciiReader(AbstractReader):
                     "channel_name": channel_name,
                     "variable_name": raw_name,
                     "units": channel.get("units"),
-                    "channel_number": index + 1 if index < len(ordered_channels) else None,
+                    "channel_number": channel_number,
                 }
             )
 
