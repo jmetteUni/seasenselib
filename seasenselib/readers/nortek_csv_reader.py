@@ -322,7 +322,12 @@ def _read_units_metadata(
     if not units_path.exists():
         raise FileNotFoundError(f"Nortek CSV units file not found: {units_path}")
 
-    units_df = pd.read_csv(units_path, dtype=str, keep_default_na=False)
+    units_df = pd.read_csv(
+        units_path,
+        dtype=str,
+        keep_default_na=False,
+        encoding="utf-8-sig",
+    )
     units: Dict[str, Dict[str, str]] = {}
     for row in units_df.to_dict("records"):
         variable = _clean_metadata_value(row.get("Variable"))
