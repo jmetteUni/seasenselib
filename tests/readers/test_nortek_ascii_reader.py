@@ -17,6 +17,13 @@ def _write_nortek_ascii_pair(tmp_path, coordinate_system="BEAM"):
                 "User setup",
                 "---------------------------------------------------------------------",
                 f"Coordinate system                     {coordinate_system}",
+                "Transformation matrix                 0.7356 -0.3677 -0.3677",
+                "                                      0.0000 -0.6370 0.6370",
+                "                                      0.7888 0.7888 0.7888",
+                "Magnetometer calibration matrix       0.9910 0.0220 -0.0229",
+                "                                      0.0220 1.0000 -0.0062",
+                "                                      -0.0180 0.0304 0.9507",
+                "Compass hard iron calibration         5 -90 10",
                 "",
                 "Data file format",
                 "---------------------------------------------------------------------",
@@ -204,8 +211,24 @@ def test_nortek_ascii_raw_metadata_contains_parsed_hdr_metadata(tmp_path):
 
     assert "raw_metadata" in ds.attrs
     payload = json.loads(ds.attrs["raw_metadata"])
-    assert payload["blocks"]["header"] is None
+    assert "header" not in payload["blocks"]
     assert payload["blocks"]["attributes"]["coordinate_system"] == "BEAM"
+    assert "transformation_matrix" not in payload["blocks"]["attributes"]
+    assert payload["blocks"]["calibration"]["transformation_matrix"] == [
+        [0.7356, -0.3677, -0.3677],
+        [0.0, -0.637, 0.637],
+        [0.7888, 0.7888, 0.7888],
+    ]
+    assert payload["blocks"]["calibration"]["magnetometer_calibration_matrix"] == [
+        [0.991, 0.022, -0.0229],
+        [0.022, 1.0, -0.0062],
+        [-0.018, 0.0304, 0.9507],
+    ]
+    assert payload["blocks"]["calibration"]["compass_hard_iron_calibration"] == [
+        5,
+        -90,
+        10,
+    ]
     assert payload["variables"]["velocity_beam1"] == {
         "column_number": "7",
         "original_name": "Velocity (Beam1|X|East)",

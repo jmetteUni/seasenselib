@@ -171,7 +171,7 @@ class ArgumentParser:
                     default=None, choices=self.INPUT_FORMATS,
                     help='Format of input file')
         parser.add_argument('-H', '--header-input', type=str, default=None,
-                    help='Path of header input file (for Nortek ASCII files)')
+                    help='Path of header/metadata input file (for Nortek ASCII or Nortek CSV String Data.csv)')
         parser.add_argument('-o', '--output', type=str,
                     help='Path of output file if plot shall be written')
         parser.add_argument('-t', '--title', type=str,
@@ -370,7 +370,7 @@ class ArgumentParser:
                     type=str, default=None, choices=input_choices,
                     help='Format of input file')
         convert_parser.add_argument('-H', '--header-input', type=str, default=None,
-                    help='Path of header input file (for Nortek ASCII files)')
+                    help='Path of header/metadata input file (for Nortek ASCII or Nortek CSV String Data.csv)')
         convert_parser.add_argument('-o', '--output', type=str, required=True,
                     help='Path of output file')
         convert_parser.add_argument('-F', '--output-format', type=str, choices=output_choices, 
@@ -418,7 +418,7 @@ class ArgumentParser:
                     default=None, choices=input_choices,
                     help='Format of input file')
         show_parser.add_argument('-H', '--header-input', type=str, default=None,
-                    help='Path of header input file (for Nortek ASCII files)')
+                    help='Path of header/metadata input file (for Nortek ASCII or Nortek CSV String Data.csv)')
         show_parser.add_argument('-s', '--schema', type=str,
                     choices=['summary', 'info', 'example'], default='summary',
                     help='What to show.')
@@ -537,7 +537,7 @@ class ArgumentParser:
                     default=None, choices=input_choices,
                     help='Format of input file')
         subset_parser.add_argument('-H', '--header-input', type=str, default=None,
-                    help='Path of header input file (for Nortek ASCII files)')
+                    help='Path of header/metadata input file (for Nortek ASCII or Nortek CSV String Data.csv)')
         subset_parser.add_argument('-o', '--output', type=str,
                     help='Path of output file')
         subset_parser.add_argument('-F', '--output-format', type=str, choices=output_choices, 
@@ -590,7 +590,7 @@ class ArgumentParser:
         calc_parser.add_argument('-f', '--input-format', type=str, default=None,
                     choices=input_choices, help='Format of input file')
         calc_parser.add_argument('-H', '--header-input', type=str, default=None,
-                    help='Path of header input file (for Nortek ASCII files)')
+                    help='Path of header/metadata input file (for Nortek ASCII or Nortek CSV String Data.csv)')
         calc_parser.add_argument('-o', '--output', type=str, 
                     help='Path of output file')
         calc_parser.add_argument('-F', '--output-format', type=str, choices=output_choices,

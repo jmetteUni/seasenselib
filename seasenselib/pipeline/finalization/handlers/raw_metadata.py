@@ -106,12 +106,13 @@ class RawMetadata:
             ds.attrs["raw_metadata_schema"] = self.schema
 
         blocks = {
-            "header": raw_header or None,
             "attributes": None,
             "calibration": None,
             "configuration": None,
             "other": None,
         }
+        if raw_header:
+            blocks["header"] = raw_header
         for block_name, block_value in raw_blocks.items():
             if block_value is not None:
                 blocks[str(block_name)] = block_value
