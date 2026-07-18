@@ -821,6 +821,7 @@ def sbe37_hex_reader(
     voltage_words_suppressed: int = 0,
     header_info: dict | None = None,
     xmlcon_info: dict | None = None,
+    xmlcon_path: Union[str, Path] | None = None,
 ) -> xr.Dataset:
     """
     Read SBE37 hex file using seabirdscientific library.
@@ -838,6 +839,8 @@ def sbe37_hex_reader(
         Pre-parsed HEX header metadata from :func:`parse_hex_header_sensors`.
     xmlcon_info : dict, optional
         Pre-parsed XMLCON metadata from :func:`sbe37_xmlcon_reader`.
+    xmlcon_path : Union[str, Path], optional
+        Path to the companion XMLCON file that produced ``xmlcon_info``.
 
     Returns
     -------
@@ -847,6 +850,8 @@ def sbe37_hex_reader(
     hex_path = Path(hex_file)
     if not hex_path.exists():
         raise FileNotFoundError(f"Hex file not found: {hex_path}")
+    if xmlcon_path is not None:
+        xmlcon_path = Path(xmlcon_path)
 
     # Parse sensors and calibration coefficients from hex header
     if header_info is None:
@@ -858,7 +863,8 @@ def sbe37_hex_reader(
     # Fallback: Look for corresponding xmlcon file if header parsing fails
     if not enabled_sensors_list:
         if xmlcon_info is None:
-            xmlcon_path = _find_sbe_hex_xmlcon_path(hex_path)
+            if xmlcon_path is None:
+                xmlcon_path = _find_sbe_hex_xmlcon_path(hex_path)
             if xmlcon_path is not None:
                 xmlcon_info = sbe37_xmlcon_reader(xmlcon_path)
         if xmlcon_info is not None:
@@ -1168,7 +1174,7 @@ def sbe37_hex_reader(
 
     # Add metadata
     ds.attrs["source_file"] = str(hex_path)
-    if xmlcon_info:
+    if xmlcon_info and xmlcon_path is not None:
         ds.attrs["xmlcon_file"] = str(xmlcon_path)
     else:
         ds.attrs["sensor_detection"] = "hex_header"
@@ -1258,6 +1264,7 @@ class SbeHexReader(AbstractReader):
             self.input_file,
             header_info=header_info,
             xmlcon_info=xmlcon_info,
+            xmlcon_path=xmlcon_path,
             **self._hex_reader_options,
         )
 

@@ -68,6 +68,7 @@ def test_sbe_hex_reader_loads_through_wrapped_function(tmp_path, monkeypatch):
                     "output_flags": {},
                 },
                 "xmlcon_info": None,
+                "xmlcon_path": None,
             },
         )
     ]
