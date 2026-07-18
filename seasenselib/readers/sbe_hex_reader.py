@@ -208,10 +208,7 @@ def _read_sbe_hex_raw_header(hex_file: Union[str, Path]) -> str | None:
 def _find_sbe_hex_xmlcon_path(hex_file: Union[str, Path]) -> Path | None:
     """Find a companion XMLCON file for an SBE HEX file, if one exists."""
     hex_path = Path(hex_file)
-    candidates = [
-        hex_path.with_suffix(".xmlcon"),
-        hex_path.parent / f"{hex_path.stem}.xmlcon",
-    ]
+    candidates = [hex_path.with_suffix(".xmlcon")]
     for candidate in candidates:
         if candidate.exists():
             return candidate
