@@ -455,6 +455,8 @@ def _build_nortek_csv_columns(
             if cell > 1:
                 variable_name = f"{variable_name}_cell{cell}"
             long_name = f"Correlation Beam {beam}"
+            if cell > 1:
+                long_name = f"{long_name} Cell {cell}"
 
         units_entry = _units_for_source_column(source_column, variable_name, units_metadata)
         columns.append(
