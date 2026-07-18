@@ -17,8 +17,19 @@ from .base import AbstractReader
 
 
 _NORTEK_VECTOR_COLUMN_RE = re.compile(
-    r"^(?P<kind>vel|amp|corr)Beam(?P<beam>\d+)#(?P<cell>\d+)$"
+    r"^(?P<kind>vel|velocity|amp|amplitude|corr|correlation)"
+    r"Beam(?P<beam>\d+)#(?P<cell>\d+)$",
+    re.IGNORECASE,
 )
+
+_NORTEK_VECTOR_KIND_ALIASES = {
+    "vel": "vel",
+    "velocity": "vel",
+    "amp": "amp",
+    "amplitude": "amp",
+    "corr": "corr",
+    "correlation": "corr",
+}
 
 _VELOCITY_AXIS_NAMES = {
     1: "x_velocity",
@@ -118,6 +129,19 @@ def _first_command(commands: Dict[str, Any], name: str) -> Dict[str, Any]:
     if isinstance(value, dict):
         return value
     return {}
+
+
+def _parse_vector_column(source_column: str) -> Optional[Dict[str, int | str]]:
+    """Parse a Nortek vector CSV column name into kind, beam, and cell."""
+    match = _NORTEK_VECTOR_COLUMN_RE.match(source_column.strip())
+    if not match:
+        return None
+
+    return {
+        "kind": _NORTEK_VECTOR_KIND_ALIASES[match.group("kind").lower()],
+        "beam": int(match.group("beam")),
+        "cell": int(match.group("cell")),
+    }
 
 
 def _first_existing_command(
@@ -368,9 +392,9 @@ def _units_for_source_column(
     if source_column in units_metadata:
         return units_metadata[source_column]
 
-    vector_match = _NORTEK_VECTOR_COLUMN_RE.match(source_column)
-    if vector_match:
-        return units_metadata.get(vector_match.group("kind"), {})
+    vector_column = _parse_vector_column(source_column)
+    if vector_column:
+        return units_metadata.get(str(vector_column["kind"]), {})
 
     if variable_name in units_metadata:
         return units_metadata[variable_name]
@@ -433,13 +457,13 @@ def _build_nortek_csv_columns(
         )
 
     for source_column in df.columns:
-        match = _NORTEK_VECTOR_COLUMN_RE.match(source_column)
-        if not match:
+        vector_column = _parse_vector_column(source_column)
+        if not vector_column:
             continue
 
-        kind = match.group("kind")
-        beam = int(match.group("beam"))
-        cell = int(match.group("cell"))
+        kind = str(vector_column["kind"])
+        beam = int(vector_column["beam"])
+        cell = int(vector_column["cell"])
 
         if kind == "vel":
             variable_name = _velocity_variable_name(beam, cell, coordinate_system)
@@ -451,6 +475,7 @@ def _build_nortek_csv_columns(
             long_name = f"Amplitude Beam {beam}"
             if cell > 1:
                 long_name = f"{long_name} Cell {cell}"
+        else:
             variable_name = f"correlation_beam{beam}"
             if cell > 1:
                 variable_name = f"{variable_name}_cell{cell}"
