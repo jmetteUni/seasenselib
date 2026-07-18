@@ -1250,12 +1250,18 @@ class SbeHexReader(AbstractReader):
             header_info,
             xmlcon_info,
         )
-        self._raw_metadata_variables = _sbe_hex_raw_variable_metadata(
-            header_info,
-            xmlcon_info,
-        )
+        ds = sbe37_hex_reader(self.input_file, **self._hex_reader_options)
 
-        return sbe37_hex_reader(self.input_file, **self._hex_reader_options)
+        self._raw_metadata_variables = {
+            name: meta
+            for name, meta in _sbe_hex_raw_variable_metadata(
+                header_info,
+                xmlcon_info,
+            ).items()
+            if name in ds.data_vars
+        }
+
+        return ds
 
     @classmethod
     def format_key(cls) -> str:
