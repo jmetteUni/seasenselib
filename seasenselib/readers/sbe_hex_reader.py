@@ -819,6 +819,8 @@ def sbe37_hex_reader(
     is_shallow: bool = True,
     frequency_channels_suppressed: int = 0,
     voltage_words_suppressed: int = 0,
+    header_info: dict | None = None,
+    xmlcon_info: dict | None = None,
 ) -> xr.Dataset:
     """
     Read SBE37 hex file using seabirdscientific library.
@@ -832,6 +834,10 @@ def sbe37_hex_reader(
         (for example ``"SBE37SMP"``). If omitted, DeviceType is read from the header.
     moored_mode, is_shallow, frequency_channels_suppressed, voltage_words_suppressed
         Advanced seabirdscientific decoder options passed through unchanged.
+    header_info : dict, optional
+        Pre-parsed HEX header metadata from :func:`parse_hex_header_sensors`.
+    xmlcon_info : dict, optional
+        Pre-parsed XMLCON metadata from :func:`sbe37_xmlcon_reader`.
 
     Returns
     -------
@@ -843,23 +849,21 @@ def sbe37_hex_reader(
         raise FileNotFoundError(f"Hex file not found: {hex_path}")
 
     # Parse sensors and calibration coefficients from hex header
-    header_info = parse_hex_header_sensors(hex_path)
+    if header_info is None:
+        header_info = parse_hex_header_sensors(hex_path)
     enabled_sensors_list = header_info["enabled_sensors"]
     calibration_coeffs = header_info.get("calibration_coefficients", {})
     device_type = header_info.get("device_type")
 
     # Fallback: Look for corresponding xmlcon file if header parsing fails
-    xmlcon_info = None
     if not enabled_sensors_list:
-        xmlcon_path = hex_path.with_suffix(".xmlcon")
-        if not xmlcon_path.exists():
-            # Try without hex extension
-            xmlcon_path = hex_path.parent / f"{hex_path.stem}.xmlcon"
-
-        if xmlcon_path.exists():
-            xmlcon_info = sbe37_xmlcon_reader(xmlcon_path)
+        if xmlcon_info is None:
+            xmlcon_path = _find_sbe_hex_xmlcon_path(hex_path)
+            if xmlcon_path is not None:
+                xmlcon_info = sbe37_xmlcon_reader(xmlcon_path)
+        if xmlcon_info is not None:
             enabled_sensors_list = xmlcon_info["enabled_sensors"]
-        else:
+        if not enabled_sensors_list:
             raise ValueError(
                 f"Could not determine sensor configuration for {hex_path}. "
                 "No xmlcon file found and header parsing failed."
@@ -1250,7 +1254,12 @@ class SbeHexReader(AbstractReader):
             header_info,
             xmlcon_info,
         )
-        ds = sbe37_hex_reader(self.input_file, **self._hex_reader_options)
+        ds = sbe37_hex_reader(
+            self.input_file,
+            header_info=header_info,
+            xmlcon_info=xmlcon_info,
+            **self._hex_reader_options,
+        )
 
         self._raw_metadata_variables = {
             name: meta

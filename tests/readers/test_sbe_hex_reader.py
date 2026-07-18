@@ -59,6 +59,15 @@ def test_sbe_hex_reader_loads_through_wrapped_function(tmp_path, monkeypatch):
                 "is_shallow": True,
                 "frequency_channels_suppressed": 0,
                 "voltage_words_suppressed": 0,
+                "header_info": {
+                    "enabled_sensors": [],
+                    "calibration_coefficients": {},
+                    "device_type": None,
+                    "sample_length": None,
+                    "tx_real_time": None,
+                    "output_flags": {},
+                },
+                "xmlcon_info": None,
             },
         )
     ]
