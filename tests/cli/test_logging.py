@@ -6,8 +6,8 @@ from seasenselib.cli.router import CLIRouter
 
 def test_cli_default_logging_suppresses_seasenselib_warnings():
     package_logger = logging.getLogger("seasenselib")
+    assert package_logger.handlers == []
     previous_level = package_logger.level
-    previous_handlers = list(package_logger.handlers)
     previous_propagate = package_logger.propagate
 
     try:
@@ -22,8 +22,6 @@ def test_cli_default_logging_suppresses_seasenselib_warnings():
         for handler in list(package_logger.handlers):
             package_logger.removeHandler(handler)
             handler.close()
-        for handler in previous_handlers:
-            package_logger.addHandler(handler)
         package_logger.setLevel(previous_level)
         package_logger.propagate = previous_propagate
 
