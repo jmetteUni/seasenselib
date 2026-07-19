@@ -13,6 +13,7 @@ pylablib = "*"
 matplotlib = "*"
 netcdf4 = "*"
 pint = "*"
+mhkit = {extras = ["dolfyn"], version = ">=1.0.0"}
 pyrsktools = "*"
 setuptools = "*"
 
