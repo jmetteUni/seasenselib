@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import numpy as np
 import pytest
 import xarray as xr
@@ -58,6 +59,16 @@ def test_sbe_hex_reader_loads_through_wrapped_function(tmp_path, monkeypatch):
                 "is_shallow": True,
                 "frequency_channels_suppressed": 0,
                 "voltage_words_suppressed": 0,
+                "header_info": {
+                    "enabled_sensors": [],
+                    "calibration_coefficients": {},
+                    "device_type": None,
+                    "sample_length": None,
+                    "tx_real_time": None,
+                    "output_flags": {},
+                },
+                "xmlcon_info": None,
+                "xmlcon_path": None,
             },
         )
     ]
@@ -141,6 +152,164 @@ def test_parse_hex_header_sensors_detects_sensors_and_coefficients(tmp_path):
         info["calibration_coefficients"]["conductivity"]["coefficients"]["cpcor"]
         == 4.0
     )
+
+
+def test_sbe_hex_reader_preserves_header_calibration_in_raw_metadata(
+    tmp_path,
+    monkeypatch,
+):
+    hex_file = tmp_path / "microcat.hex"
+    hex_file.write_text(
+        "\n".join(
+            [
+                "* Sea-Bird SBE37SM-RS232 Data File:",
+                '*<HardwareData DeviceType="SBE37SM-RS232" SerialNumber="03725586">',
+                '*  <Sensor id="Temperature"/>',
+                '*  <Sensor id="Conductivity"/>',
+                "*</HardwareData>",
+                "*<SampleLength>10</SampleLength>",
+                "*<TxRealTime>yes</TxRealTime>",
+                "*<OutputTemperature>yes</OutputTemperature>",
+                "*<OutputConductivity>yes</OutputConductivity>",
+                "*<CalibrationCoefficients>",
+                '*  <Calibration id="Temperature" format="TEMP1">',
+                "*    <SerialNum>03725586</SerialNum>",
+                "*    <CalDate>12-Feb-23</CalDate>",
+                "*    <A0>-1.074513e-04</A0>",
+                "*    <A1>3.084169e-04</A1>",
+                "*    <A2>-4.679346e-06</A2>",
+                "*    <A3>2.069519e-07</A3>",
+                "*  </Calibration>",
+                '*  <Calibration id="Conductivity" format="WBCOND0">',
+                "*    <SerialNum>03725586</SerialNum>",
+                "*    <CalDate>12-Feb-23</CalDate>",
+                "*    <G>-1.005547e+00</G>",
+                "*    <H>1.500570e-01</H>",
+                "*    <I>-4.063591e-04</I>",
+                "*    <J>5.294997e-05</J>",
+                "*    <PCOR>-9.570000e-08</PCOR>",
+                "*    <TCOR>3.250000e-06</TCOR>",
+                "*    <WBOTC>-9.634356e-08</WBOTC>",
+                "*  </Calibration>",
+                "*</CalibrationCoefficients>",
+                "*END*",
+                "03DA5C0A22C8318B0E81",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    expected = xr.Dataset(
+        {
+            "temp": ("time", np.array([1.0])),
+            "cond": ("time", np.array([2.0])),
+        },
+        coords={"time": np.array(["2024-01-01"], dtype="datetime64[ns]")},
+    )
+    expected["temp"].attrs["units"] = "degrees_C"
+    expected["cond"].attrs["units"] = "mS/cm"
+
+    def fake_sbe37_hex_reader(input_file, **kwargs):
+        return expected
+
+    monkeypatch.setattr(
+        "seasenselib.readers.sbe_hex_reader.sbe37_hex_reader",
+        fake_sbe37_hex_reader,
+    )
+
+    ds = SbeHexReader(str(hex_file)).data
+
+    payload = json.loads(ds.attrs["raw_metadata"])
+    assert "A0" in payload["blocks"]["header"]
+    assert payload["blocks"]["attributes"]["device_type"] == "SBE37SM-RS232"
+    assert payload["blocks"]["attributes"]["enabled_sensors"] == [
+        "temperature",
+        "conductivity",
+    ]
+    assert payload["blocks"]["configuration"]["output_flags"] == {
+        "OutputTemperature": True,
+        "OutputConductivity": True,
+    }
+    calibration = payload["blocks"]["calibration"]["hex_header"]
+    assert calibration["temperature"]["format"] == "TEMP1"
+    assert calibration["temperature"]["serial_number"] == "03725586"
+    assert calibration["temperature"]["calibration_date"] == "12-Feb-23"
+    assert calibration["temperature"]["coefficients"]["a0"] == -1.074513e-04
+    assert calibration["conductivity"]["coefficients"]["g"] == -1.005547
+    assert payload["variables"]["temp"]["sensor_type"] == "temperature"
+    assert payload["variables"]["temp"]["serial_number"] == "03725586"
+    assert payload["variables"]["cond"]["sensor_type"] == "conductivity"
+
+
+def test_sbe_hex_reader_preserves_companion_xmlcon_calibration(
+    tmp_path,
+    monkeypatch,
+):
+    hex_file = tmp_path / "microcat.hex"
+    hex_file.write_text(
+        "\n".join(
+            [
+                "*<Sensor id='Temperature'/>",
+                "*<SampleLength>10</SampleLength>",
+                "*<TxRealTime>yes</TxRealTime>",
+                "*END*",
+                "03DA5C0A22C8318B0E81",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    xmlcon_file = tmp_path / "microcat.xmlcon"
+    xmlcon_file.write_text(
+        "\n".join(
+            [
+                '<?xml version="1.0" encoding="UTF-8"?>',
+                "<SBE_InstrumentConfiguration>",
+                "  <Instrument>",
+                '    <SensorArray Size="1">',
+                '      <Sensor index="0" SensorID="58">',
+                '        <TemperatureSensor SensorID="58">',
+                "          <SerialNumber>13840</SerialNumber>",
+                "          <CalibrationDate>27-Aug-15</CalibrationDate>",
+                "          <A0>-1.48631100e-004</A0>",
+                "          <A1>3.12384300e-004</A1>",
+                "          <A2>-4.72688900e-006</A2>",
+                "          <A3>2.06721200e-007</A3>",
+                "          <Slope>1.00000000</Slope>",
+                "          <Offset>0.0000</Offset>",
+                "        </TemperatureSensor>",
+                "      </Sensor>",
+                "    </SensorArray>",
+                "  </Instrument>",
+                "</SBE_InstrumentConfiguration>",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    expected = xr.Dataset(
+        {"temp": ("time", np.array([1.0]))},
+        coords={"time": np.array(["2024-01-01"], dtype="datetime64[ns]")},
+    )
+    expected["temp"].attrs["units"] = "degrees_C"
+
+    def fake_sbe37_hex_reader(input_file, **kwargs):
+        return expected
+
+    monkeypatch.setattr(
+        "seasenselib.readers.sbe_hex_reader.sbe37_hex_reader",
+        fake_sbe37_hex_reader,
+    )
+
+    ds = SbeHexReader(str(hex_file)).data
+
+    payload = json.loads(ds.attrs["raw_metadata"])
+    assert payload["blocks"]["attributes"]["xmlcon_file"] == str(xmlcon_file)
+    xmlcon_calibration = payload["blocks"]["calibration"]["xmlcon"]
+    assert xmlcon_calibration["temperature"]["serial_number"] == "13840"
+    assert xmlcon_calibration["temperature"]["calibration_date"] == "27-Aug-15"
+    assert xmlcon_calibration["temperature"]["coefficients"]["a0"] == -1.486311e-4
+    assert xmlcon_calibration["temperature"]["metadata"] == {
+        "slope": 1.0,
+        "offset": 0.0,
+    }
 
 
 def test_select_sbe37_instrument_type_from_header_and_override():

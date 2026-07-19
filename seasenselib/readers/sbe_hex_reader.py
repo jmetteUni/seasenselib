@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 import re
 from types import SimpleNamespace
@@ -14,6 +15,8 @@ import xarray as xr
 import seasenselib.parameters as params
 from seasenselib.readers.base import AbstractReader
 
+
+logger = logging.getLogger(__name__)
 
 _SENSOR_ID_RE = re.compile(r"<Sensor\b[^>]*\bid=(['\"])(?P<sensor_id>[^'\"]+)\1")
 _DEVICE_TYPE_RE = re.compile(r"\bDeviceType=(['\"])(?P<device_type>[^'\"]+)\1")
@@ -28,6 +31,16 @@ _SBE37_FORMAT0_HEX_LENGTHS = {
     "SBE63 oxygen phase": 6,
     "SBE63 oxygen temperature": 6,
     "date time": 8,
+}
+
+_SBE_HEX_VARIABLE_SENSOR_TYPES = {
+    "temp": "temperature",
+    "cond": "conductivity",
+    "press": "pressure",
+    "oxygen": "oxygen",
+    "oxygen_ml_l": "oxygen",
+    "oxygen_phase": "oxygen",
+    "oxygen_temp": "oxygen",
 }
 
 
@@ -172,6 +185,152 @@ def _parse_bool_text(value: str) -> bool | None:
     if value in {"no", "false", "0"}:
         return False
     return None
+
+
+def _read_sbe_hex_raw_header(hex_file: Union[str, Path]) -> str | None:
+    """Read the SBE HEX header verbatim up to the data section."""
+    lines = []
+    with Path(hex_file).open("r", encoding="utf-8", errors="replace") as handle:
+        for line in handle:
+            if not line.startswith("*") and lines:
+                break
+            if line.strip().startswith("*END*"):
+                lines.append(line.rstrip("\n"))
+                break
+            if line.startswith("*"):
+                lines.append(line.rstrip("\n"))
+
+    if not lines:
+        return None
+    return "\n".join(lines)
+
+
+def _find_sbe_hex_xmlcon_path(hex_file: Union[str, Path]) -> Path | None:
+    """Find a companion XMLCON file for an SBE HEX file, if one exists."""
+    hex_path = Path(hex_file)
+    candidates = [hex_path.with_suffix(".xmlcon")]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _normalise_sbe_hex_calibration_info(sensor_info: dict) -> dict:
+    """Return a JSON-friendly calibration record."""
+    coefficients = dict(sensor_info.get("coefficients", {}) or {})
+    record = {
+        "type": sensor_info.get("type"),
+        "format": sensor_info.get("format"),
+        "coefficients": coefficients,
+    }
+
+    serial_number = (
+        sensor_info.get("serial_number")
+        or sensor_info.get("serialnum")
+        or coefficients.get("serialnum")
+    )
+    calibration_date = (
+        sensor_info.get("calibration_date")
+        or sensor_info.get("caldate")
+        or coefficients.get("caldate")
+    )
+    if serial_number is not None:
+        record["serial_number"] = serial_number
+    if calibration_date is not None:
+        record["calibration_date"] = calibration_date
+    if sensor_info.get("metadata"):
+        record["metadata"] = sensor_info["metadata"]
+    if sensor_info.get("index") is not None:
+        record["index"] = sensor_info["index"]
+    return {key: value for key, value in record.items() if value is not None}
+
+
+def _sbe_hex_calibration_block(header_info: dict, xmlcon_info: dict | None) -> dict:
+    """Build structured calibration metadata from HEX and XMLCON sources."""
+    calibration = {}
+
+    header_coefficients = header_info.get("calibration_coefficients") or {}
+    if header_coefficients:
+        calibration["hex_header"] = {
+            sensor_type: _normalise_sbe_hex_calibration_info(sensor_info)
+            for sensor_type, sensor_info in header_coefficients.items()
+        }
+
+    if xmlcon_info:
+        calibration["xmlcon"] = {
+            sensor_info["type"]: _normalise_sbe_hex_calibration_info(sensor_info)
+            for sensor_info in xmlcon_info.get("sensors", {}).values()
+        }
+
+    return calibration
+
+
+def _sbe_hex_raw_metadata_blocks(
+    header_info: dict,
+    xmlcon_info: dict | None,
+) -> dict:
+    """Build SeaSenseLib raw metadata blocks for SBE HEX files."""
+    attributes = {
+        "enabled_sensors": header_info.get("enabled_sensors", []),
+        "device_type": header_info.get("device_type"),
+        "sample_length": header_info.get("sample_length"),
+        "tx_real_time": header_info.get("tx_real_time"),
+    }
+    attributes = {
+        key: value
+        for key, value in attributes.items()
+        if value is not None and value != []
+    }
+
+    if xmlcon_info and xmlcon_info.get("xmlcon_path"):
+        attributes["xmlcon_file"] = str(xmlcon_info["xmlcon_path"])
+
+    configuration = {}
+    output_flags = header_info.get("output_flags") or {}
+    if output_flags:
+        configuration["output_flags"] = output_flags
+
+    calibration = _sbe_hex_calibration_block(header_info, xmlcon_info)
+
+    blocks = {}
+    if attributes:
+        blocks["attributes"] = attributes
+    if configuration:
+        blocks["configuration"] = configuration
+    if calibration:
+        blocks["calibration"] = calibration
+    return blocks
+
+
+def _sbe_hex_raw_variable_metadata(
+    header_info: dict,
+    xmlcon_info: dict | None,
+) -> dict:
+    """Build variable-level raw metadata for SBE HEX output variables."""
+    variables = {}
+    header_coefficients = header_info.get("calibration_coefficients") or {}
+    xmlcon_sensors = {}
+    if xmlcon_info:
+        xmlcon_sensors = {
+            sensor_info["type"]: sensor_info
+            for sensor_info in xmlcon_info.get("sensors", {}).values()
+        }
+
+    for variable_name, sensor_type in _SBE_HEX_VARIABLE_SENSOR_TYPES.items():
+        sensor_info = header_coefficients.get(sensor_type) or xmlcon_sensors.get(
+            sensor_type
+        )
+        if not sensor_info and sensor_type not in header_info.get("enabled_sensors", []):
+            continue
+
+        metadata = {"sensor_type": sensor_type}
+        normalised = _normalise_sbe_hex_calibration_info(sensor_info or {})
+        for key in ("serial_number", "calibration_date", "format", "index"):
+            if key in normalised:
+                metadata[key] = normalised[key]
+        variables[variable_name] = metadata
+
+    return variables
 
 
 def _select_sbe37_instrument_type(
@@ -638,9 +797,7 @@ def parse_hex_header_sensors(hex_file: Union[str, Path]) -> Dict:
                     }
 
     except Exception as e:
-        import logging
-
-        logging.getLogger(__name__).warning(
+        logger.warning(
             "Could not parse calibration coefficients in %s: %s", hex_path, e
         )
 
@@ -662,6 +819,9 @@ def sbe37_hex_reader(
     is_shallow: bool = True,
     frequency_channels_suppressed: int = 0,
     voltage_words_suppressed: int = 0,
+    header_info: dict | None = None,
+    xmlcon_info: dict | None = None,
+    xmlcon_path: Union[str, Path] | None = None,
 ) -> xr.Dataset:
     """
     Read SBE37 hex file using seabirdscientific library.
@@ -675,6 +835,12 @@ def sbe37_hex_reader(
         (for example ``"SBE37SMP"``). If omitted, DeviceType is read from the header.
     moored_mode, is_shallow, frequency_channels_suppressed, voltage_words_suppressed
         Advanced seabirdscientific decoder options passed through unchanged.
+    header_info : dict, optional
+        Pre-parsed HEX header metadata from :func:`parse_hex_header_sensors`.
+    xmlcon_info : dict, optional
+        Pre-parsed XMLCON metadata from :func:`sbe37_xmlcon_reader`.
+    xmlcon_path : Union[str, Path], optional
+        Path to the companion XMLCON file that produced ``xmlcon_info``.
 
     Returns
     -------
@@ -684,33 +850,37 @@ def sbe37_hex_reader(
     hex_path = Path(hex_file)
     if not hex_path.exists():
         raise FileNotFoundError(f"Hex file not found: {hex_path}")
+    if xmlcon_path is not None:
+        xmlcon_path = Path(xmlcon_path)
 
     # Parse sensors and calibration coefficients from hex header
-    header_info = parse_hex_header_sensors(hex_path)
+    if header_info is None:
+        header_info = parse_hex_header_sensors(hex_path)
     enabled_sensors_list = header_info["enabled_sensors"]
     calibration_coeffs = header_info.get("calibration_coefficients", {})
     device_type = header_info.get("device_type")
 
     # Fallback: Look for corresponding xmlcon file if header parsing fails
-    xmlcon_info = None
     if not enabled_sensors_list:
-        xmlcon_path = hex_path.with_suffix(".xmlcon")
-        if not xmlcon_path.exists():
-            # Try without hex extension
-            xmlcon_path = hex_path.parent / f"{hex_path.stem}.xmlcon"
-
-        if xmlcon_path.exists():
-            xmlcon_info = sbe37_xmlcon_reader(xmlcon_path)
+        if xmlcon_info is None:
+            if xmlcon_path is None:
+                xmlcon_path = _find_sbe_hex_xmlcon_path(hex_path)
+            if xmlcon_path is not None:
+                xmlcon_info = sbe37_xmlcon_reader(xmlcon_path)
+        if xmlcon_info is not None:
             enabled_sensors_list = xmlcon_info["enabled_sensors"]
-        else:
+        if not enabled_sensors_list:
             raise ValueError(
                 f"Could not determine sensor configuration for {hex_path}. "
                 "No xmlcon file found and header parsing failed."
             )
 
-    print(f"Detected enabled sensors: {enabled_sensors_list}")
+    logger.info("Detected enabled sensors: %s", enabled_sensors_list)
     if calibration_coeffs:
-        print(f"Found calibration coefficients for: {list(calibration_coeffs.keys())}")
+        logger.info(
+            "Found calibration coefficients for: %s",
+            list(calibration_coeffs.keys()),
+        )
 
     try:
         import seabirdscientific.instrument_data as id
@@ -740,15 +910,18 @@ def sbe37_hex_reader(
         instrument_type=instrument_type,
     )
 
-    print(f"Using instrument type: {instrument_type.value}")
-    print(f"Enabled sensors: {[s.value for s in enabled_sensors]}")
+    logger.info("Using instrument type: %s", instrument_type.value)
+    logger.debug(
+        "Enabled seabirdscientific sensors: %s",
+        [s.value for s in enabled_sensors],
+    )
 
     layout = detect_sbe_hex_layout(
         header_info=header_info,
         enabled_sensors_list=enabled_sensors_list,
         instrument_type=instrument_type,
     )
-    print(f"Detected hex layout: {layout.name}")
+    logger.info("Detected hex layout: %s", layout.name)
 
     # Read the hex file. This deliberately keeps seabirdscientific's line decoder,
     # but avoids its slow pandas scalar assignment loop.
@@ -792,7 +965,7 @@ def sbe37_hex_reader(
 
     # Apply calibration coefficients if available (from header or xmlcon)
     if calibration_coeffs or xmlcon_info:
-        print("Applying calibration coefficients to convert raw data")
+        logger.info("Applying calibration coefficients to convert raw data")
 
         # Use header calibration coefficients if available.
         if calibration_coeffs:
@@ -944,7 +1117,7 @@ def sbe37_hex_reader(
                     data_vars["oxygen_temp"] = ("time", oxygen_temp)
 
             except Exception as e:
-                print(f"Warning: Could not apply oxygen calibration: {e}")
+                logger.warning("Could not apply oxygen calibration: %s", e)
                 data_vars["oxygen_phase"] = (
                     "time",
                     raw_data["SBE63 oxygen phase"].values,
@@ -955,7 +1128,7 @@ def sbe37_hex_reader(
                 )
     else:
         # No xmlcon file - use raw data directly from seabirdscientific
-        print("No calibration coefficients available - using raw converted data")
+        logger.info("No calibration coefficients available; using raw converted data")
 
         # Add available sensors from raw_data
         if "temperature" in raw_data.columns:
@@ -1002,7 +1175,10 @@ def sbe37_hex_reader(
     # Add metadata
     ds.attrs["source_file"] = str(hex_path)
     if xmlcon_info:
-        ds.attrs["xmlcon_file"] = str(xmlcon_path)
+        if xmlcon_path is not None:
+            ds.attrs["xmlcon_file"] = str(xmlcon_path)
+        else:
+            ds.attrs["sensor_detection"] = "xmlcon_metadata"
     else:
         ds.attrs["sensor_detection"] = "hex_header"
     if device_type:
@@ -1057,6 +1233,9 @@ class SbeHexReader(AbstractReader):
             "voltage_words_suppressed": kwargs.pop("voltage_words_suppressed", 0),
         }
         super().__init__(input_file, mapping, **kwargs)
+        self._raw_header = None
+        self._raw_metadata_blocks = {}
+        self._raw_metadata_variables = {}
         self._validate_file()
 
     @classmethod
@@ -1066,7 +1245,42 @@ class SbeHexReader(AbstractReader):
 
     def _load_data(self) -> xr.Dataset:
         """Load the SBE HEX file using the original standalone function."""
-        return sbe37_hex_reader(self.input_file, **self._hex_reader_options)
+        header_info = parse_hex_header_sensors(self.input_file)
+        xmlcon_info = None
+        xmlcon_path = _find_sbe_hex_xmlcon_path(self.input_file)
+        if xmlcon_path is not None:
+            try:
+                xmlcon_info = sbe37_xmlcon_reader(xmlcon_path)
+            except Exception as exc:
+                logger.warning(
+                    "Could not parse companion SBE XMLCON metadata %s: %s",
+                    xmlcon_path,
+                    exc,
+                )
+
+        self._raw_header = _read_sbe_hex_raw_header(self.input_file)
+        self._raw_metadata_blocks = _sbe_hex_raw_metadata_blocks(
+            header_info,
+            xmlcon_info,
+        )
+        ds = sbe37_hex_reader(
+            self.input_file,
+            header_info=header_info,
+            xmlcon_info=xmlcon_info,
+            xmlcon_path=xmlcon_path,
+            **self._hex_reader_options,
+        )
+
+        self._raw_metadata_variables = {
+            name: meta
+            for name, meta in _sbe_hex_raw_variable_metadata(
+                header_info,
+                xmlcon_info,
+            ).items()
+            if name in ds.data_vars
+        }
+
+        return ds
 
     @classmethod
     def format_key(cls) -> str:
