@@ -376,8 +376,8 @@ class MyFormatReader(AbstractReader):
     def file_extension() -> str:
         return ".myf"
 
-    @staticmethod
-    def file_extensions() -> tuple[str, ...]:
+    @classmethod
+    def file_extensions(cls) -> tuple[str, ...]:
         return (".myf", ".myformat")
 ```
 
