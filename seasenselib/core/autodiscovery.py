@@ -389,14 +389,16 @@ class ReaderDiscovery(BaseDiscovery):
                     hasattr(class_obj, 'format_name')):
 
                     extensions = self._get_reader_file_extensions(class_obj)
-                    primary_extensions = _normalize_extensions(
-                        class_obj.file_extension()
-                    ) if hasattr(class_obj, 'file_extension') else ()
-                    primary_extension = (
-                        primary_extensions[0]
-                        if primary_extensions
-                        else (extensions[0] if extensions else None)
-                    )
+                    primary_extension = None
+                    if hasattr(class_obj, 'file_extension'):
+                        primary_extensions = _normalize_extensions(class_obj.file_extension())
+                        primary_extension = (
+                            primary_extensions[0]
+                            if primary_extensions
+                            else None
+                        )
+                    elif extensions:
+                        primary_extension = extensions[0]
 
                     format_info = {
                         'class_name': class_name,
