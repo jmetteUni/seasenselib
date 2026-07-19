@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
@@ -79,6 +80,17 @@ def _install_fake_mhkit(monkeypatch, read_rdi):
         io=SimpleNamespace(rdi=SimpleNamespace(read_rdi=read_rdi))
     )
     monkeypatch.setitem(sys.modules, "mhkit", mhkit)
+
+
+def _rdi_smoke_test_file() -> Path:
+    path = os.environ.get("SEASENSELIB_RDI_RAW_EXAMPLE")
+    if not path:
+        pytest.skip("Set SEASENSELIB_RDI_RAW_EXAMPLE to run RDI raw smoke tests")
+
+    example = Path(path)
+    if not example.exists():
+        pytest.skip(f"RDI raw smoke-test file does not exist: {example}")
+    return example
 
 
 def test_rdi_raw_reader_exposes_format_metadata():
@@ -518,9 +530,7 @@ def test_rdi_raw_reader_lists_primary_and_all_extensions():
 
 def test_rdi_example_smoke_when_mhkit_is_available():
     pytest.importorskip("mhkit")
-    example = Path(__file__).resolve().parents[2] / "examples" / "trdi_adcp" / "DS2_2025_recovery.000"
-    if not example.exists():
-        pytest.skip("RDI ADCP example file is not available")
+    example = _rdi_smoke_test_file()
 
     ds = ssl.read(
         str(example),
@@ -536,9 +546,7 @@ def test_rdi_example_smoke_when_mhkit_is_available():
 
 def test_rdi_example_can_be_written_to_netcdf_when_mhkit_is_available(tmp_path):
     pytest.importorskip("mhkit")
-    example = Path("examples/trdi_adcp/_RDI_000.000")
-    if not example.exists():
-        pytest.skip("RDI ADCP netCDF example file is not available")
+    example = _rdi_smoke_test_file()
 
     ds = ssl.read(
         str(example),
