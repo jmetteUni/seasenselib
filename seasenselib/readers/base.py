@@ -1012,7 +1012,7 @@ class AbstractReader(ABC):
         --------
         str | None
             The primary file extension (e.g., '.cnv', '.tob', '.rsk'), or
-            None when the reader should not be selected by extension alone.
+            None when there is no single primary extension (see :meth:`file_extensions`).
 
         Raises:
         -------
