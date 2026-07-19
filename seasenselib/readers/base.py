@@ -1001,16 +1001,18 @@ class AbstractReader(ABC):
     @classmethod
     @abstractmethod
     def file_extension(cls) -> str | None:
-        """Get the file extension for this reader.
+        """Get the primary file extension for this reader.
 
         This property must be implemented by all subclasses.
-        The extension must be unique over all registered readers.
-        If a reader does not specify a unique file extension, just return `None`.
+        The primary extension must be unique over all registered readers.
+        If a reader does not specify a unique primary file extension, just
+        return `None`.
 
         Returns:
         --------
-        str
-            The file extension (e.g., '.cnv', '.tob', '.rsk').
+        str | None
+            The primary file extension (e.g., '.cnv', '.tob', '.rsk'), or
+            None when there is no single primary extension (see :meth:`file_extensions`).
 
         Raises:
         -------
@@ -1018,6 +1020,23 @@ class AbstractReader(ABC):
             If the subclass does not implement this property.
         """
         raise NotImplementedError("Reader classes must define a file extension")
+
+    @classmethod
+    def file_extensions(cls) -> tuple[str, ...]:
+        """Get all extensions that can be auto-detected for this reader.
+
+        Subclasses with multiple unique file suffixes should override this
+        method. The default keeps backward compatibility by exposing only the
+        primary extension returned by :meth:`file_extension`.
+
+        Returns:
+        --------
+        tuple[str, ...]
+            Supported auto-detect extensions. The first entry should match
+            :meth:`file_extension` when a primary extension exists.
+        """
+        extension = cls.file_extension()
+        return (extension,) if extension else ()
     
     @classmethod
     def format_mappings(cls) -> Dict[str, list]:

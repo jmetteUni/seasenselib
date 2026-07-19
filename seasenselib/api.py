@@ -323,7 +323,7 @@ def write(dataset: 'xr.Dataset', filename: str,
         raise RuntimeError(f"Error writing file {filename}: {e}") from e
 
 
-def formats() -> List[Dict[str, str]]:
+def formats() -> List[Dict[str, Any]]:
     """
     List all supported input file formats.
 
@@ -333,10 +333,12 @@ def formats() -> List[Dict[str, str]]:
     
     Returns
     -------
-    List[Dict[str, str]]
+    List[Dict[str, Any]]
         List of dictionaries containing format information with keys:
-        'name', 'key', 'class_name', 'extension', 'is_plugin'
-        Note: 'extension' is always present (None if not applicable)
+        'name', 'key', 'class_name', 'extension', 'extensions', 'is_plugin'
+        Note: 'extension' is the primary extension and is always present
+        (None if not applicable). 'extensions' contains all advertised
+        auto-detect extensions.
         
     Examples
     --------
@@ -351,7 +353,7 @@ def formats() -> List[Dict[str, str]]:
     return list_readers()
 
 
-def list_readers() -> List[Dict[str, str]]:
+def list_readers() -> List[Dict[str, Any]]:
     """
     List all available reader formats (including plugins).
 
@@ -360,10 +362,12 @@ def list_readers() -> List[Dict[str, str]]:
     
     Returns
     -------
-    List[Dict[str, str]]
+    List[Dict[str, Any]]
         List of dictionaries containing reader information with keys:
-        'name', 'key', 'class_name', 'extension', 'is_plugin'
-        Note: 'extension' is always present (None if not applicable)
+        'name', 'key', 'class_name', 'extension', 'extensions', 'is_plugin'
+        Note: 'extension' is the primary extension and is always present
+        (None if not applicable). 'extensions' contains all advertised
+        auto-detect extensions.
         
     Examples
     --------
