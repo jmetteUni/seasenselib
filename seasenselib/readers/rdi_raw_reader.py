@@ -242,9 +242,7 @@ class RdiRawReader(AbstractReader):
 
     def _build_raw_metadata_blocks(self, ds: xr.Dataset) -> dict[str, Any]:
         """Build opaque raw metadata blocks for the finalization stage."""
-        attrs = dict(ds.attrs)
         return {
-            "attributes": attrs,
             "configuration": {
                 "dolfyn_reader": self._dolfyn_reader_source,
                 "reader_options": self._read_options(),
