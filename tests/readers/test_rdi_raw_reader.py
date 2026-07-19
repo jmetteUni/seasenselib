@@ -518,7 +518,7 @@ def test_rdi_raw_reader_lists_primary_and_all_extensions():
 
 def test_rdi_example_smoke_when_mhkit_is_available():
     pytest.importorskip("mhkit")
-    example = Path("examples/trdi_adcp/DS2_2025_recovery.000")
+    example = Path(__file__).resolve().parents[2] / "examples" / "trdi_adcp" / "DS2_2025_recovery.000"
     if not example.exists():
         pytest.skip("RDI ADCP example file is not available")
 
