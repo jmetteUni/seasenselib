@@ -288,8 +288,8 @@ class TestReadersCompleteness(unittest.TestCase):
                       f"{', '.join(non_compliant_classes)}")
 
     def test_file_extensions_are_unique(self):
-        """Test that file extensions are unique across all reader classes."""
-        # Collect file extensions from all reader classes
+        """Test that primary file extensions are unique across all reader classes."""
+        # Collect primary file extensions from all reader classes
         extension_to_class = {}
 
         for class_name in self.all_list:
@@ -318,13 +318,46 @@ class TestReadersCompleteness(unittest.TestCase):
                 if file_extension in extension_to_class:
                     self.fail(f"File extension '{file_extension}' is used by both "
                              f"'{extension_to_class[file_extension]}' and '{class_name}'. "
-                             f"File extensions must be unique to avoid ambiguity.")
+                             f"Primary file extensions must be unique to avoid ambiguity.")
 
                 extension_to_class[file_extension] = class_name
 
         # Ensure we found at least some extensions
         self.assertGreater(len(extension_to_class), 0, 
                           "At least one reader class should have a file extension")
+
+    def test_auto_detect_file_extensions_are_unique(self):
+        """Test that auto-detect extensions are unique across reader classes."""
+        extension_to_class = {}
+
+        for class_name in self.all_list:
+            if class_name == 'AbstractReader':
+                continue
+
+            with self.subTest(class_name=class_name):
+                reader_class = getattr(self.readers_module, class_name)
+
+                try:
+                    file_extensions = reader_class.file_extensions()
+                except Exception as e:
+                    self.fail(f"Failed to get file_extensions from {class_name}: {e}")
+
+                for file_extension in file_extensions:
+                    if file_extension is None:
+                        continue
+
+                    if not file_extension.startswith('.'):
+                        file_extension = '.' + file_extension
+                    file_extension = file_extension.lower()
+
+                    if file_extension in extension_to_class:
+                        self.fail(
+                            f"File extension '{file_extension}' is used by both "
+                            f"'{extension_to_class[file_extension]}' and '{class_name}'. "
+                            f"Auto-detect file extensions must be unique to avoid ambiguity."
+                        )
+
+                    extension_to_class[file_extension] = class_name
 
     def test_format_keys_are_unique_and_valid(self):
         """Test that format keys are unique, not None, and follow kebab-case convention."""
@@ -387,7 +420,7 @@ class TestReadersCompleteness(unittest.TestCase):
 
     def test_format_info_entries_are_valid_dicts(self):
         """Test that all format info entries are valid dictionaries with required keys."""
-        required_keys = {'key', 'name', 'class_name'}
+        required_keys = {'key', 'name', 'class_name', 'extensions'}
         
         for i, entry in enumerate(self.format_info):
             with self.subTest(entry_index=i):
@@ -424,8 +457,12 @@ class TestReadersCompleteness(unittest.TestCase):
                               f"must be in kebab-case format")
 
     def test_file_extensions_are_unique_when_present(self):
-        """Test that file extensions are unique (when not None)."""
-        extensions = [entry.get('extension') for entry in self.format_info if entry.get('extension')]
+        """Test that autodiscovery file extensions are unique (when present)."""
+        extensions = [
+            ext
+            for entry in self.format_info
+            for ext in entry.get('extensions', [])
+        ]
         normalized_extensions = [ext.lower() for ext in extensions if ext]
         duplicates = [ext for ext in set(normalized_extensions) if normalized_extensions.count(ext) > 1]
         self.assertEqual([], duplicates, f"Duplicate file extensions: {duplicates}")
@@ -525,6 +562,13 @@ class TestReadersCompleteness(unittest.TestCase):
                     self.assertEqual(expected_extension, actual_extension,
                                    f"Format info extension '{expected_extension}' doesn't match "
                                    f"class method result '{actual_extension}' for {class_name}")
+
+                if hasattr(reader_class, 'file_extensions'):
+                    actual_extensions = list(reader_class.file_extensions())
+                    expected_extensions = entry.get('extensions')
+                    self.assertEqual(expected_extensions, actual_extensions,
+                                   f"Format info extensions '{expected_extensions}' don't match "
+                                   f"class method result '{actual_extensions}' for {class_name}")
 
     def test_all_list_matches_autodiscovery(self):
         """Test that __all__ list matches autodiscovered class names plus AbstractReader."""

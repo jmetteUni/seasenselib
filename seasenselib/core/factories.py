@@ -196,4 +196,3 @@ class WriterFactory:
             List of format info dicts with keys: 'key', 'name', 'extension', 'class_name'
         """
         return self._discovery.get_format_info()
-

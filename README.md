@@ -91,6 +91,9 @@ sbe_data = ssl.read("station_001.cnv", file_format='sbe-cnv')
 # RBR logger data  
 rbr_data = ssl.read("temperature_logger.rsk", file_format='rbr-rsk')
 
+# RDI raw ADCP data
+adcp_data = ssl.read("DS2_2025_recovery.000", file_format='rdi-raw')
+
 # See all supported readers
 readers = ssl.list_readers()
 for reader in readers:
@@ -372,6 +375,10 @@ class MyFormatReader(AbstractReader):
     @staticmethod
     def file_extension() -> str:
         return ".myf"
+
+    @staticmethod
+    def file_extensions() -> tuple[str, ...]:
+        return (".myf", ".myformat")
 ```
 
 **2. Register via entry points in `pyproject.toml`:**

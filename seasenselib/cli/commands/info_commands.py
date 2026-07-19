@@ -77,10 +77,13 @@ class ListCommand(BaseCommand):
         """Convert format info to unified structure with type."""
         result = []
         for format_info in format_info_list:
+            extensions = format_info.get('extensions') or []
+            extension_text = ', '.join(extensions)
             item = {
                 'name': format_info.get('name', 'Unknown'),
                 'key': format_info['key'],
-                'extension': format_info.get('extension') or '',
+                'extension': extension_text or format_info.get('extension') or '',
+                'extensions': extensions,
                 'class': format_info['class_name'],
                 'type': resource_type,
                 'is_plugin': format_info.get('is_plugin', False)

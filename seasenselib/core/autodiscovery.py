@@ -11,7 +11,7 @@ import inspect
 import os
 import pkgutil
 from pathlib import Path
-from typing import Dict, List, Type, Set, Optional
+from typing import Any, Dict, List, Type, Set, Optional
 from abc import ABC
 from .exceptions import FormatDetectionError
 
@@ -48,6 +48,34 @@ def _get_expected_module_name(class_name: str, base_class_name: str) -> str:
     else:
         # Fallback for unusual naming patterns
         return _convert_class_name_to_module_name(class_name)
+
+
+def _normalize_extensions(extensions: Any) -> tuple[str, ...]:
+    """Normalize extension declarations to lowercase dotted suffixes."""
+    if extensions is None:
+        return ()
+
+    if isinstance(extensions, str):
+        raw_extensions = (extensions,)
+    else:
+        try:
+            raw_extensions = tuple(extensions)
+        except TypeError:
+            return ()
+
+    normalized = []
+    for extension in raw_extensions:
+        if extension is None:
+            continue
+        text = str(extension).strip().lower()
+        if not text:
+            continue
+        if not text.startswith('.'):
+            text = f'.{text}'
+        if text not in normalized:
+            normalized.append(text)
+
+    return tuple(normalized)
 
 
 class BaseDiscovery:
@@ -268,6 +296,16 @@ class ReaderDiscovery(BaseDiscovery):
             entry_point_group='seasenselib.readers'
         )
 
+    def _get_reader_file_extensions(self, reader_class: Type) -> tuple[str, ...]:
+        """Return all auto-detect extensions declared by a reader class."""
+        if hasattr(reader_class, 'file_extensions'):
+            extensions = reader_class.file_extensions()
+        elif hasattr(reader_class, 'file_extension'):
+            extensions = reader_class.file_extension()
+        else:
+            extensions = None
+        return _normalize_extensions(extensions)
+
     def get_reader_by_format_key(self, format_key: str) -> Optional[Type]:
         """
         Get reader class by format key.
@@ -312,29 +350,33 @@ class ReaderDiscovery(BaseDiscovery):
         """
         classes = self.discover_classes()
         matching_readers = []
+        normalized_extension = _normalize_extensions(extension)
+        if not normalized_extension:
+            return matching_readers
+        normalized_extension = normalized_extension[0]
 
         for _, class_obj in classes.items():
             try:
-                # Check if class has file_extension method and it matches
-                if hasattr(class_obj, 'file_extension'):
-                    if class_obj.file_extension() == extension:
-                        matching_readers.append(class_obj)
-            except (AttributeError, TypeError):
-                # Skip classes that don't implement file_extension properly
+                if normalized_extension in self._get_reader_file_extensions(class_obj):
+                    matching_readers.append(class_obj)
+            except (AttributeError, TypeError, NotImplementedError):
+                # Skip classes that don't implement extension methods properly
                 continue
 
         return matching_readers
 
-    def get_format_info(self) -> List[Dict[str, str]]:
+    def get_format_info(self) -> List[Dict[str, Any]]:
         """
         Get format information for all discovered readers using their static methods.
         
         Returns:
         --------
-        List[Dict[str, str]]
+        List[Dict[str, Any]]
             List of format information dictionaries with keys:
-            'class_name', 'name', 'key', 'extension', 'is_plugin'
-            Note: 'extension' is always present (None if not applicable)
+            'class_name', 'name', 'key', 'extension', 'extensions', 'is_plugin'
+            Note: 'extension' is the primary extension and is always present
+            (None if not applicable). 'extensions' contains all advertised
+            auto-detect extensions.
         """
         classes = self.discover_classes()
         plugin_classes = self.get_plugin_classes()
@@ -346,19 +388,24 @@ class ReaderDiscovery(BaseDiscovery):
                 if (hasattr(class_obj, 'format_key') and 
                     hasattr(class_obj, 'format_name')):
 
+                    extensions = self._get_reader_file_extensions(class_obj)
+                    primary_extensions = _normalize_extensions(
+                        class_obj.file_extension()
+                    ) if hasattr(class_obj, 'file_extension') else ()
+                    primary_extension = (
+                        primary_extensions[0]
+                        if primary_extensions
+                        else (extensions[0] if extensions else None)
+                    )
+
                     format_info = {
                         'class_name': class_name,
                         'name': class_obj.format_name(),
                         'key': class_obj.format_key(),
                         'is_plugin': class_name in plugin_classes,
-                        'extension': None  # Default to None
+                        'extension': primary_extension,
+                        'extensions': list(extensions),
                     }
-
-                    # Get file extension if available
-                    if hasattr(class_obj, 'file_extension'):
-                        ext = class_obj.file_extension()
-                        if ext:
-                            format_info['extension'] = ext
 
                     formats.append(format_info)
             except (AttributeError, TypeError, NotImplementedError):
@@ -645,11 +692,18 @@ class FormatDetector:
 
         # Map extension to format using autodiscovery
         discovery = ReaderDiscovery()
-        format_info = discovery.get_format_info()
+        matching_readers = discovery.get_readers_by_extension(extension)
 
-        for info in format_info:
-            if info.get('extension') == extension:
-                return info['key']
+        if len(matching_readers) == 1:
+            return matching_readers[0].format_key()
+
+        if len(matching_readers) > 1:
+            matching_keys = sorted(reader.format_key() for reader in matching_readers)
+            raise FormatDetectionError(
+                f"Cannot determine format for file: {input_file}. "
+                f"Extension '{extension}' is ambiguous. Use file_format with one of: "
+                f"{', '.join(matching_keys)}"
+            )
 
         # If no extension match, raise an error
         raise FormatDetectionError(
