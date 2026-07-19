@@ -180,19 +180,8 @@ SeaSenseLib can automatically detect format for files with unique extensions:
    # Automatic detection also works for supported RDI raw suffixes:
    rdi_data = ssl.read('DS2_2025_recovery.000', nens=100)
 
-RDI raw ADCP notes
-^^^^^^^^^^^^^^^^^^
-
-The ``rdi-raw`` reader keeps the DOLfYN xarray structure intact and
-stores DOLfYN/global instrument metadata in SeaSenseLib's raw metadata
-container. Conservative mappings such as ``temp`` to ``temperature`` and
-``c_sound`` to ``speed_of_sound`` are applied by the normal processing pipeline.
-
-Velocity is preserved as DOLfYN's vector variable ``vel``. If
-``ds.attrs["coord_sys"]`` is ``"earth"``, the first three components represent
-east, north and up; for ``beam``, ``inst``, ``ship`` or ``principal`` data,
-renaming those components to CF east/north/up variables would require a
-reviewed rotation or deployment-specific interpretation.
+For reader-specific interpretation notes, including conservative RDI raw ADCP
+mapping choices, see :doc:`reader_notes`.
 
 Format Detection Summary
 ------------------------
