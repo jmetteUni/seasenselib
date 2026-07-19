@@ -226,16 +226,23 @@ class CLIRouter:
         verbose = getattr(parsed_args, 'verbose', False)
         level_name = getattr(parsed_args, 'verbose_level', None)
         log_target = getattr(parsed_args, 'verbose_log', None)
+        package_logger = logging.getLogger("seasenselib")
+
+        for handler in list(package_logger.handlers):
+            package_logger.removeHandler(handler)
+            handler.close()
+        package_logger.propagate = False
 
         if not verbose and not log_target:
-            # Clamp SeaSenseLib logs to warnings by default to avoid noisy INFO output
-            logging.getLogger("seasenselib").setLevel(logging.WARNING)
+            # Keep normal CLI output quiet; warnings are shown with --verbose.
+            package_logger.setLevel(logging.ERROR)
             return
 
         if level_name:
             level = getattr(logging, level_name.upper(), logging.INFO)
         else:
             level = logging.INFO
+        package_logger.setLevel(level)
 
         log_path = None
         if log_target:
@@ -254,22 +261,20 @@ class CLIRouter:
                 logger.debug("Failed to create log directory for '%s'", log_path, exc_info=True)
 
         handlers = []
+        formatter = logging.Formatter(
+            "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+        )
         if verbose:
             stream_handler = logging.StreamHandler()
             stream_handler.setLevel(level)
+            stream_handler.setFormatter(formatter)
             handlers.append(stream_handler)
 
         if log_path:
             file_handler = logging.FileHandler(log_path)
             file_handler.setLevel(level)
+            file_handler.setFormatter(formatter)
             handlers.append(file_handler)
 
-        if not handlers:
-            return
-
-        logging.basicConfig(
-            level=level,
-            format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-            handlers=handlers,
-            force=True
-        )
+        for handler in handlers:
+            package_logger.addHandler(handler)
