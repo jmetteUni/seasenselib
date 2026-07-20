@@ -234,7 +234,7 @@ class CLIRouter:
         package_logger.propagate = False
 
         if not verbose and not log_target:
-            # Suppress package logging unless --verbose/--verbose-log is used.
+            # Suppress all package logging unless --verbose/--verbose-log is used.
             package_logger.setLevel(logging.ERROR)
             return
 
