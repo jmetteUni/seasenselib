@@ -122,8 +122,7 @@ def _dataset_with_netcdf_safe_attrs(ds):
             for attr_name in _DATETIME_ENCODING_ATTRS:
                 if attr_name not in attrs:
                     continue
-                encoding.setdefault(attr_name, attrs.pop(attr_name))
-
+                encoding[attr_name] = attrs.pop(attr_name)
         return attrs, encoding
 
     safe = ds.copy(deep=False)
