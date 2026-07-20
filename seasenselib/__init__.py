@@ -23,10 +23,23 @@ API Structure:
 - ssl.list_plotters(): List available plotters (including plugins)
 - ssl.list_parameters(): List canonical parameter names
 - ssl.list_all()     : List all available resources
+- ssl.get_version()  : Return the current SeaSenseLib version
 """
 
 # Core API imports - always available
-from .api import read, write, plot, formats, list_readers, list_writers, list_plotters, list_parameters, list_all
+from .api import (
+    read,
+    write,
+    plot,
+    formats,
+    list_readers,
+    list_writers,
+    list_plotters,
+    list_parameters,
+    list_all,
+    get_version,
+)
+from ._version import __version__
 
 # Lazy loading for heavy modules
 from importlib import import_module
@@ -34,9 +47,6 @@ from typing import Any
 
 # Module cache for lazy loading
 _loaded_modules = {}
-
-# Version info
-__version__ = "0.5.1"
 
 def __getattr__(name: str) -> Any:
     """
@@ -74,5 +84,6 @@ __all__ = [
     'list_plotters',
     'list_parameters',
     'list_all',
+    'get_version',
     '__version__'
 ]

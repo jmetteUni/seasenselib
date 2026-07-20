@@ -8,6 +8,7 @@ import sys
 import logging
 from typing import List
 from ..core.exceptions import SeaSenseLibError
+from .._version import PACKAGE_NAME, get_version
 from .parser import ArgumentParser
 from .commands import CommandFactory
 
@@ -77,6 +78,10 @@ class CLIRouter:
             Catches unexpected errors and prints an error message. 
         """
         try:
+            if args and args[0] in ('-v', '--version'):
+                print(f"{PACKAGE_NAME} {get_version()}")
+                return 0
+
             # Quick parse to get command name
             command_name = self.argument_parser.parse_command_quickly(args)
 

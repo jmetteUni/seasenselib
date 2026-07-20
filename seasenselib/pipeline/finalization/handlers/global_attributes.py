@@ -11,15 +11,9 @@ from pathlib import Path
 import logging
 
 from ...base import StageContext
+from ...._version import get_version
 
 logger = logging.getLogger(__name__)
-
-# Get SeaSenseLib version
-try:
-    from importlib.metadata import version as get_version
-    VERSION = get_version('seasenselib')
-except Exception:
-    VERSION = 'unknown'
 
 
 class GlobalAttributes:
@@ -132,7 +126,7 @@ class GlobalAttributes:
         str
             History entry string.
         """
-        parts = [f"{timestamp} - Processed by SeaSenseLib v{VERSION}"]
+        parts = [f"{timestamp} - Processed by SeaSenseLib v{get_version()}"]
         
         # Add reader information
         if 'reader_class' in context.metadata:

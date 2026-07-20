@@ -5,6 +5,8 @@ Command-line argument parsing with lazy loading capabilities.
 import argparse
 from typing import List, Optional
 
+from .._version import PACKAGE_NAME, get_version
+
 
 class _HideFormatsHelpFormatter(argparse.RawTextHelpFormatter):
     """Custom formatter that hides legacy commands from help output."""
@@ -220,6 +222,9 @@ class ArgumentParser:
             description='SeaSenseLib - Oceanographic sensor data processing',
             formatter_class=_HideFormatsHelpFormatter
         )
+        parser.add_argument('-v', '--version', action='version',
+                    version=f'{PACKAGE_NAME} {get_version()}',
+                    help='Show the SeaSenseLib version and exit')
 
         subparsers = parser.add_subparsers(dest='command', help='Available commands')
 
