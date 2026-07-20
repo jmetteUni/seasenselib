@@ -234,7 +234,7 @@ class CLIRouter:
         package_logger.propagate = False
 
         if not verbose and not log_target:
-            # Keep normal CLI output quiet; warnings are shown with --verbose.
+            # Keep normal CLI output quiet unless --verbose/--verbose-log is used.
             package_logger.setLevel(logging.ERROR)
             return
 
