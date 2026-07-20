@@ -403,10 +403,11 @@ if period_seconds == 0:
             },
         )
 
-        physical_name = _safe_variable_name(channel_name)
-        if physical_name == raw_name:
-            physical_name = f"{raw_name}_phys"
-
+physical_name = _safe_variable_name(channel_name) or f"{raw_name}_phys"
+if physical_name == raw_name:
+    physical_name = f"{raw_name}_phys"
+if physical_name in data_vars:
+    physical_name = f"{physical_name}_{channel_number}"
         if len(calibration) == 4:
             physical_data = _apply_rbr_cal(raw_array, calibration)
             calibration_method = (
