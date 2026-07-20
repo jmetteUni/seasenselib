@@ -70,7 +70,7 @@ def _read_pyproject_version(pyproject_path: Path) -> Optional[str]:
 def _find_project_version() -> Optional[str]:
     """Find the nearest pyproject.toml that belongs to SeaSenseLib."""
     package_path = Path(__file__).resolve()
-    for directory in (package_path.parent, *package_path.parents):
+    for directory in package_path.parents:
         pyproject_path = directory / "pyproject.toml"
         if not pyproject_path.is_file():
             continue
