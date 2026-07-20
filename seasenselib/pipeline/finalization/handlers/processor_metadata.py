@@ -13,14 +13,9 @@ import logging
 import platform
 
 from ...base import StageContext
+from ...._version import get_version
 
 logger = logging.getLogger(__name__)
-
-try:
-    from importlib.metadata import version as _get_version
-    _SSL_VERSION = _get_version("seasenselib")
-except Exception:
-    _SSL_VERSION = "unknown"
 
 
 @dataclass
@@ -53,7 +48,7 @@ class ProcessorMetadata:
             ds.attrs[key] = value
 
         set_attr("processor_name", "SeaSenseLib")
-        set_attr("processor_version", _SSL_VERSION)
+        set_attr("processor_version", get_version())
         set_attr("processor_level", self.level)
         set_attr("processing_level", self.level)
 

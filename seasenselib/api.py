@@ -7,6 +7,7 @@ without requiring knowledge of the internal CLI structure.
 
 from typing import List, Dict, Optional, TYPE_CHECKING, Any
 from .core import DataIOManager
+from ._version import get_version
 
 if TYPE_CHECKING:
     import xarray as xr
