@@ -70,6 +70,7 @@ dependencies = [
   "netcdf4",
   "pint",
   "gsw",
+  "mhkit[dolfyn]>=1.0.0",
   "pyrsktools",
   "seabirdscientific>=1.2.0",
   "setuptools",

@@ -5,10 +5,14 @@ import logging
 from pathlib import Path
 import tempfile
 
+import numpy as np
+
 from seasenselib.core.exceptions import WriterError
 from seasenselib.writers.base import AbstractWriter
 
 logger = logging.getLogger(__name__)
+
+_DATETIME_ENCODING_ATTRS = ("units", "calendar")
 
 
 def _netcdf_name_with_slashes_replaced(name):
@@ -106,6 +110,21 @@ def _dataset_with_netcdf_safe_attrs(ds):
                 return json.dumps(list(value))
         return value
 
+    def clean_variable_metadata(var):
+        """Return attrs and encoding safe for NetCDF writing."""
+        attrs = {
+            attr_name: clean_attr_value(attr_value)
+            for attr_name, attr_value in var.attrs.items()
+        }
+        encoding = dict(var.encoding)
+
+        if np.issubdtype(var.dtype, np.datetime64):
+            for attr_name in _DATETIME_ENCODING_ATTRS:
+                if attr_name not in attrs:
+                    continue
+                encoding[attr_name] = attrs.pop(attr_name)
+        return attrs, encoding
+
     safe = ds.copy(deep=False)
     safe.attrs = {
         attr_name: clean_attr_value(attr_value)
@@ -113,16 +132,14 @@ def _dataset_with_netcdf_safe_attrs(ds):
     }
 
     for var_name, var in ds.data_vars.items():
-        safe[var_name].attrs = {
-            attr_name: clean_attr_value(attr_value)
-            for attr_name, attr_value in var.attrs.items()
-        }
+        attrs, encoding = clean_variable_metadata(var)
+        safe[var_name].attrs = attrs
+        safe[var_name].encoding = encoding
 
     for coord_name, coord in ds.coords.items():
-        safe[coord_name].attrs = {
-            attr_name: clean_attr_value(attr_value)
-            for attr_name, attr_value in coord.attrs.items()
-        }
+        attrs, encoding = clean_variable_metadata(coord)
+        safe[coord_name].attrs = attrs
+        safe[coord_name].encoding = encoding
 
     return safe
 

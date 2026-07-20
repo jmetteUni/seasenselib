@@ -83,3 +83,31 @@ def test_netcdf_writer_writes_valid_dataset_with_cleaned_attrs(tmp_path):
         assert (
             written["conductivity"].attrs["metadata"] == '{"units_source": "CNV"}'
         )
+
+
+def test_netcdf_writer_moves_datetime_units_attrs_to_encoding(tmp_path):
+    ds = xr.Dataset(
+        {"temperature": ("time", np.array([1.0, 2.0]))},
+        coords={
+            "time": np.array(
+                ["2026-01-01T00:00:00", "2026-01-01T00:00:01"],
+                dtype="datetime64[ns]",
+            )
+        },
+    )
+    ds["time"].attrs["units"] = "seconds since 1970-01-01"
+    ds["time"].attrs["calendar"] = "proleptic_gregorian"
+    ds["time"].attrs["long_name"] = "Time"
+    output = tmp_path / "time_units.nc"
+
+    NetCdfWriter(ds).write(str(output))
+
+    assert ds["time"].attrs["units"] == "seconds since 1970-01-01"
+    assert ds["time"].attrs["calendar"] == "proleptic_gregorian"
+    with xr.open_dataset(output) as written:
+        assert written["time"].values.tolist() == ds["time"].values.tolist()
+        assert written["time"].attrs["long_name"] == "Time"
+
+    with xr.open_dataset(output, decode_times=False) as raw:
+        assert raw["time"].attrs["units"] == "seconds since 1970-01-01"
+        assert raw["time"].attrs["calendar"] == "proleptic_gregorian"

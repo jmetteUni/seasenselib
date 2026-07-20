@@ -8,6 +8,7 @@ pylablib
 matplotlib
 netcdf4
 pint
+mhkit[dolfyn]>=1.0.0
 pyrsktools
 seabirdscientific>=1.2.0
 gsw

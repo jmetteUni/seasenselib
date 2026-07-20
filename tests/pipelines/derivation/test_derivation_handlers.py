@@ -5,6 +5,7 @@ import xarray as xr
 from seasenselib.pipeline.base import StageContext
 from seasenselib.pipeline.interfaces import IDerivation
 from seasenselib.pipeline.derivation.handlers.derivation_runner import DerivationRunner
+from seasenselib.pipeline.derivation.handlers.utils import units_ok
 
 import seasenselib.pipeline.derivation.handlers.density_derivation as density_mod
 import seasenselib.pipeline.derivation.handlers.potential_temperature_derivation as pt_mod
@@ -134,6 +135,13 @@ def test_depth_derivation_requires_pressure_units():
     ds = xr.Dataset({"pressure": (["time"], [1.0, 2.0])})
     derivation = depth_mod.DepthDerivation()
     assert derivation.can_derive(ds) is False
+
+
+def test_salinity_derivations_accept_cf_generic_salinity_units():
+    ds = _base_dataset()
+    ds["salinity"].attrs["units"] = "1e-3"
+
+    assert units_ok(ds, "salinity", "salinity") is True
 
 
 def test_depth_derivation_default_latitude_behavior(monkeypatch):

@@ -5,6 +5,7 @@
   ],
   "salinity": [
     "1",
+    "1e-3",
     "dimensionless"
   ],
   "pressure": [
