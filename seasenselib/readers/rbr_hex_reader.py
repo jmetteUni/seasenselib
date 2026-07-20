@@ -329,10 +329,11 @@ def _read_rbr_hex_dataset(file_path: str | Path) -> tuple[xr.Dataset, dict[str, 
             f"{_BINARY_HEADER_LEN}-byte binary header."
         )
 
-    log_start, log_end, period_seconds = _parse_binary_header(raw[:_BINARY_HEADER_LEN])
-    if period_seconds == 0 and meta.get("sample_period_str"):
-        period_seconds = _parse_sample_period_seconds(meta["sample_period_str"])
-
+log_start, log_end, period_seconds = _parse_binary_header(raw[:_BINARY_HEADER_LEN])
+if period_seconds == 0 and meta.get("sample_period_str"):
+    period_seconds = _parse_sample_period_seconds(meta["sample_period_str"])
+if period_seconds == 0:
+    raise ValueError(f"{path.name}: sample period is 0; cannot build time axis")
     n_channels = meta["n_channels"]
     n_samples = meta["n_samples"]
     record_bytes = 3 * n_channels
