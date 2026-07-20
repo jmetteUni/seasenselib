@@ -55,7 +55,13 @@ def test_cli_verbose_logging_enables_requested_level_without_root_logging(monkey
         for handler in list(package_logger.handlers):
             package_logger.removeHandler(handler)
             handler.close()
-        for handler in previous_handlers:
-            package_logger.addHandler(handler)
         package_logger.setLevel(previous_level)
         package_logger.propagate = previous_propagate
+
+        for handler in list(root_logger.handlers):
+            root_logger.removeHandler(handler)
+            if handler not in previous_root_handlers:
+                handler.close()
+        for handler in previous_root_handlers:
+            root_logger.addHandler(handler)
+        root_logger.setLevel(previous_root_level)
