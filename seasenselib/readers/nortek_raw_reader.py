@@ -216,9 +216,12 @@ def _patched_aquadopp_template(
 
     try:
         nortek_module = importlib.import_module(module_name)
-        defs_module = importlib.import_module(
-            f"{module_name.rsplit('.', 1)[0]}.nortek_defs"
+        defs_base = (
+            module_name
+            if module_name.endswith(".io")
+            else module_name.rsplit(".", 1)[0]
         )
+        defs_module = importlib.import_module(f"{defs_base}.nortek_defs")
     except (ImportError, ValueError):
         yield None
         return
