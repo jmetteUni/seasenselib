@@ -15,12 +15,12 @@ import re
 import warnings
 from collections import defaultdict
 from datetime import datetime, timezone
-from importlib.metadata import version
 from typing import Optional, Callable
 
 import xarray as xr
 
 import seasenselib.parameters as params
+from seasenselib._version import get_version
 
 MODULE_NAME = 'seasenselib'
 
@@ -304,7 +304,7 @@ class DatasetProcessor:
             The xarray Dataset with global attributes assigned.
         """
         module_name = MODULE_NAME
-        module_version = version(MODULE_NAME)
+        module_version = get_version()
         python_version = platform.python_version()
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
