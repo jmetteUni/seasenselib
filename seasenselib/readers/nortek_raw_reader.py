@@ -771,7 +771,7 @@ class NortekRawReader(AbstractReader):
 
     def _mapping_notes(self, ds: xr.Dataset) -> dict[str, Any]:
         """Describe conservative mapping choices."""
-        coord_sys = str(ds.attrs.get("coord_sys", "")).lower() or None
+        coord_sys = str(ds.attrs.get("coord_sys", "")).strip().lower() or None
         safe_mappings = {}
         for source, canonical in (
             ("temp", params.TEMPERATURE),
