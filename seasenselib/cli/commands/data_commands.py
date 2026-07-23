@@ -144,18 +144,14 @@ def _build_stage_kwargs(args):
     
     # Check for --pipeline-skip-stages argument
     elif getattr(args, 'pipeline_skip_stages', None):
-        # Build a list of all steps except the skipped ones
         skip = [s.strip() for s in args.pipeline_skip_stages.split(',')]
         try:
-            from ...pipeline.registry import StageRegistry
             from ...pipeline.config import PipelineConfig
-            registry = StageRegistry.get_instance()
-            all_steps = registry.list_stages()
-            selected_steps = [s for s in all_steps if s not in skip]
-            # Build pipeline config with selected steps
-            config = PipelineConfig()
-            for step_name in selected_steps:
-                config.add_stage(step_name)
+            config = PipelineConfig.from_resource("default")
+            config.pipeline = [
+                stage for stage in config.pipeline
+                if stage.name not in skip
+            ]
             stage_kwargs['pipeline_config'] = config
         except Exception:
             # If registry fails, just pass the skip info and let read() handle it
@@ -272,6 +268,7 @@ def _write_processing_protocol(
         protocol["handlers_applied"] = metadata.get("handlers_applied")
         protocol["variable_mappings"] = metadata.get("variable_mappings")
         protocol["derived_parameters"] = metadata.get("derived_parameters")
+        protocol["transformations"] = metadata.get("transformations")
         unit_conversions = _format_unit_conversions(metadata.get("unit_conversions"))
         if unit_conversions is not None:
             protocol["unit_conversions"] = unit_conversions
@@ -428,8 +425,7 @@ class ShowCommand(BaseCommand):
             elif args.schema == 'info':
                 data.info()
             elif args.schema == 'example':
-                df = data.to_dataframe()
-                print(df.head())
+                _print_dataset_example(data)
 
             # Write processing protocol if requested
             if want_protocol:
