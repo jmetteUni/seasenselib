@@ -717,6 +717,24 @@ class NortekRawReader(AbstractReader):
             "fields": fields,
         }
 
+    def pipeline_transformations(self, ds: xr.Dataset) -> list[Any]:
+        """Return no reader-provided coordinate transformations for raw data.
+
+        Nortek ASCII and CSV readers expose velocity as explicit SeaSenseLib
+        component triplets such as ``velocity_beam1``/``velocity_beam2``/
+        ``velocity_beam3`` or ``east_velocity``/``north_velocity``/
+        ``up_velocity``. The coordinate transformation handler works on those
+        scalar triplets.
+
+        The raw reader intentionally preserves DOLfYN's decoded vector variable
+        ``vel`` and its ``dir`` coordinate. Splitting that vector into scalar
+        components is a separate interpretation step, because the meaning of
+        ``dir`` depends on DOLfYN metadata such as ``coord_sys`` and on raw-file
+        variants that still need validation. Returning an empty list here makes
+        that limitation explicit and keeps raw reads reproducible.
+        """
+        return []
+
     def _postprocess_after_pipeline(self, ds: xr.Dataset) -> xr.Dataset:
         """Expose raw-variable metadata under mapped variable names as well."""
         if "raw_metadata" not in ds.attrs or not self._processing_metadata:

@@ -365,3 +365,26 @@ def test_nortek_csv_raw_metadata_matches_ascii_shape(tmp_path):
         "units": "m/s",
         "description": "Velocity data.",
     }
+
+
+def test_nortek_csv_reader_can_transform_beam_to_enu(tmp_path):
+    csv_file = _write_nortek_csv_with_coordinate_system(tmp_path, "BEAM")
+    header_file, units_file = _write_nortek_csv_metadata_files(tmp_path, "BEAM")
+
+    ds = NortekCsvReader(
+        str(csv_file),
+        input_header_file=str(header_file),
+        units_file=str(units_file),
+        target_coordinate_system="ENU",
+        pointing_down=False,
+    ).data
+
+    assert ds.attrs["coordinate_system"] == "ENU"
+    assert {"east_velocity", "north_velocity", "up_velocity"}.issubset(ds.data_vars)
+    assert {"velocity_beam1", "velocity_beam2", "velocity_beam3"}.isdisjoint(
+        ds.data_vars
+    )
+
+    transformation_records = json.loads(ds.attrs["processor_transformations"])
+    assert transformation_records[0]["parameters"]["source_coordinate_system"] == "BEAM"
+    assert transformation_records[0]["parameters"]["target_coordinate_system"] == "ENU"
