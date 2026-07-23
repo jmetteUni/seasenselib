@@ -763,6 +763,12 @@ class AbstractReader(ABC):
                     metadata['raw_metadata_variables'] = getattr(self, "_raw_metadata_variables")
                 if self._user_metadata:
                     metadata['user_metadata'] = self._user_metadata
+                reader_groups = self.reader_groups()
+                if reader_groups:
+                    metadata['reader_groups'] = list(reader_groups)
+                reader_transformations = self.pipeline_transformations(ds)
+                if reader_transformations:
+                    metadata['reader_transformations'] = list(reader_transformations)
                 
                 # Create pipeline (custom or default)
                 if self._pipeline_config is not None:
@@ -1076,3 +1082,31 @@ class AbstractReader(ABC):
         - Supports flexible, extensible architecture
         """
         return {}  # Default: no format-specific mappings
+
+    @classmethod
+    def reader_groups(cls) -> tuple[str, ...]:
+        """Return optional reader-group identifiers for pipeline controls.
+
+        Reader groups allow pipeline stages to enable/disable behavior for
+        related formats such as ``nortek-ascii`` and ``nortek-csv`` without
+        coupling the stage to concrete reader classes. The default derives the
+        group from the format key prefix before the first hyphen.
+        """
+        try:
+            format_key = cls.format_key()
+        except Exception:
+            return ()
+        if not isinstance(format_key, str) or "-" not in format_key:
+            return ()
+        group = format_key.split("-", 1)[0].strip().lower()
+        return (group,) if group else ()
+
+    def pipeline_transformations(self, ds: xr.Dataset) -> list[Any]:
+        """Return optional transformation handlers for this concrete dataset.
+
+        Readers can override this hook when a transformation depends on data,
+        header metadata, or reader state. The transformation stage accepts
+        objects implementing ``ITransformation``. The default performs no
+        transformations.
+        """
+        return []

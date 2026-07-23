@@ -25,6 +25,7 @@ class StageRegistry:
     DEFAULT_STAGE_NAMES = [
         "mapping",
         "unit_handling",
+        "transformation",
         "derivation",
         "metadata_extraction",
         "metadata_enrichment",
@@ -94,6 +95,7 @@ class StageRegistry:
             from .derivation.stage import DerivationStage
             from .metadata_extraction.stage import MetadataExtractionStage
             from .unit_handling.stage import UnitHandlingStage
+            from .transformation.stage import TransformationStage
             from .metadata_enrichment.stage import MetadataEnrichmentStage
             from .validation.stage import ValidationStage
             from .finalization.stage import FinalizationStage
@@ -103,6 +105,7 @@ class StageRegistry:
                 DerivationStage,
                 MetadataExtractionStage,
                 UnitHandlingStage,
+                TransformationStage,
                 MetadataEnrichmentStage,
                 ValidationStage,
                 FinalizationStage,

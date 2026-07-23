@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Dict, Any
+import json
 import logging
 import platform
 
@@ -71,6 +72,14 @@ class ProcessorMetadata:
             set_attr("processor_machine", platform.node())
         if self.include_os:
             set_attr("processor_os", f"{platform.system()} {platform.release()}")
+
+        transformations = meta.get("transformations")
+        if transformations:
+            set_attr(
+                "processor_transformations",
+                json.dumps(transformations, ensure_ascii=False, default=str),
+            )
+            set_attr("processor_transformations_count", len(transformations))
 
         context.dataset = ds
         logger.debug("Added processor metadata attributes")

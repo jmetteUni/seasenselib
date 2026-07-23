@@ -19,11 +19,12 @@ def default_pipeline() -> Pipeline:
     The default pipeline includes (in order):
     1. Mapping
     2. Unit Handling
-    3. Derivation
-    4. Metadata Extraction
-    5. Metadata Enrichment
-    6. Validation
-    7. Finalization
+    3. Transformation
+    4. Derivation
+    5. Metadata Extraction
+    6. Metadata Enrichment
+    7. Validation
+    8. Finalization
     """
     config = PipelineConfig.from_resource("default")
     return create_pipeline(config=config)

@@ -15,12 +15,25 @@ def test_default_profile_unit_handling_is_normalize_only():
     assert stage.config.get("handlers") == ["normalize"]
 
 
+def test_default_profile_includes_reader_transformation_after_unit_handling():
+    cfg = PipelineConfig.from_resource("default")
+    stage_names = [stage.name for stage in cfg.pipeline]
+
+    assert stage_names.index("unit_handling") + 1 == stage_names.index(
+        "transformation"
+    )
+    stage = next((s for s in cfg.pipeline if s.name == "transformation"), None)
+    assert stage is not None
+    assert stage.config.get("handlers") == ["reader"]
+
+
 def test_full_profile_includes_all_stages():
     cfg = PipelineConfig.from_resource("full")
     stage_names = [stage.name for stage in cfg.pipeline]
     assert stage_names == [
         "mapping",
         "unit_handling",
+        "transformation",
         "derivation",
         "metadata_extraction",
         "metadata_enrichment",

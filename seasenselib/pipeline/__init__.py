@@ -8,6 +8,8 @@ from .base import Stage, StageContext
 from .pipeline import Pipeline
 from .config import PipelineConfig, StageConfig
 from .registry import StageRegistry
+from .interfaces import ITransformation, TransformationRecord
+from .transformation import TransformationStage
 from .factory import (
     default_pipeline,
     minimal_pipeline,
@@ -22,6 +24,9 @@ __all__ = [
     "PipelineConfig",
     "StageConfig",
     "StageRegistry",
+    "ITransformation",
+    "TransformationRecord",
+    "TransformationStage",
     "default_pipeline",
     "minimal_pipeline",
     "create_pipeline",
