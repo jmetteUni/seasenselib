@@ -239,3 +239,24 @@ def test_nortek_ascii_raw_metadata_contains_parsed_hdr_metadata(tmp_path):
         "original_name": "Pressure",
         "units": "m",
     }
+
+
+def test_nortek_ascii_reader_can_transform_beam_to_xyz(tmp_path):
+    dat_file, hdr_file = _write_nortek_ascii_pair(tmp_path, "BEAM")
+
+    ds = NortekAsciiReader(
+        str(dat_file),
+        str(hdr_file),
+        target_coordinate_system="XYZ",
+        pointing_down=False,
+    ).data
+
+    assert ds.attrs["coordinate_system"] == "XYZ"
+    assert {"x_velocity", "y_velocity", "z_velocity"}.issubset(ds.data_vars)
+    assert {"velocity_beam1", "velocity_beam2", "velocity_beam3"}.isdisjoint(
+        ds.data_vars
+    )
+
+    transformation_records = json.loads(ds.attrs["processor_transformations"])
+    assert transformation_records[0]["parameters"]["source_coordinate_system"] == "BEAM"
+    assert transformation_records[0]["parameters"]["target_coordinate_system"] == "XYZ"

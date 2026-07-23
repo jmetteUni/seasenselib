@@ -60,6 +60,10 @@ BUILTIN_HANDLERS: Dict[str, Dict[str, str]] = {
     },
     "transformation": {
         "reader": "seasenselib.pipeline.transformation.handlers.reader_transformations.ReaderTransformations",
+        "nortek_coordinate_system": (
+            "seasenselib.pipeline.transformation.handlers."
+            "nortek_coordinate_transformation.NortekCoordinateTransformation"
+        ),
     },
     "metadata_enrichment": {
         "cf": "seasenselib.pipeline.metadata_enrichment.handlers.cf_convention.CFConvention",

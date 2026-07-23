@@ -182,6 +182,13 @@ def test_nortek_raw_reader_is_discoverable_by_extension():
     assert get_readers_by_extension(".wpr") == [NortekRawReader]
 
 
+def test_nortek_raw_reader_does_not_register_coordinate_transformations(tmp_path):
+    raw_file = _write_raw_file(tmp_path)
+    reader = NortekRawReader(str(raw_file), perform_default_postprocessing=False)
+
+    assert reader.pipeline_transformations(_dolfyn_like_dataset("beam")) == []
+
+
 def test_nortek_raw_reader_wraps_mhkit_dolfyn(monkeypatch, tmp_path, capsys):
     raw_file = _write_raw_file(tmp_path)
     expected = _dolfyn_like_dataset("earth")

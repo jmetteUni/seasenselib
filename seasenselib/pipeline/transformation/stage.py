@@ -8,7 +8,7 @@ import logging
 from ..base import Stage, StageContext
 from ..handler_registry import HandlerRegistry, HANDLER_GROUP_TRANSFORMATIONS
 from ..interfaces import ITransformation
-from ..utils import resolve_components
+from .handlers.nortek_coordinate_transformation import NortekCoordinateTransformation
 from .handlers.reader_transformations import ReaderTransformations
 from .handlers.transformation_runner import TransformationRunner
 
@@ -77,8 +77,7 @@ class TransformationStage(Stage):
         if self._explicit_transformations is not None and "handlers" not in config:
             transformations = list(self._explicit_transformations)
         else:
-            mapping = self._handler_mapping(self._handler_order)
-            transformations = resolve_components(self._handler_order, mapping)
+            transformations = self._configured_handlers(config)
 
         self._runner = TransformationRunner(
             transformations=transformations,
@@ -97,6 +96,7 @@ class TransformationStage(Stage):
     def _handler_mapping(handler_order: List[str]) -> Dict[str, type[ITransformation]]:
         mapping: Dict[str, type[ITransformation]] = {
             "reader": ReaderTransformations,
+            "nortek_coordinate_system": NortekCoordinateTransformation,
         }
         if any(name not in mapping for name in handler_order):
             plugin_mapping = HandlerRegistry.get(
@@ -106,6 +106,20 @@ class TransformationStage(Stage):
             for name, cls in plugin_mapping.items():
                 mapping.setdefault(name, cls)
         return mapping
+
+    def _configured_handlers(self, config: Dict[str, Any]) -> list[ITransformation]:
+        mapping = self._handler_mapping(self._handler_order)
+        transformations: list[ITransformation] = []
+        for name in self._handler_order:
+            cls = mapping.get(name)
+            if cls is None:
+                continue
+            transformation = cls()
+            handler_config = config.get(name, {})
+            if isinstance(handler_config, dict) and hasattr(transformation, "configure"):
+                transformation.configure(handler_config)
+            transformations.append(transformation)
+        return transformations
 
     def _context_enabled(self, metadata: Dict[str, Any]) -> bool:
         format_key = str(metadata.get("format_key") or "").lower()

@@ -89,6 +89,10 @@ class NortekAsciiReader(AbstractReader):
     def __init__(self, dat_file_path: str,
                  header_file_path: str,
                  mapping: dict | None = None,
+                 target_coordinate_system: str | None = None,
+                 pointing_down: bool | str | None = None,
+                 coordinate_transform_keep_source: bool = False,
+                 coordinate_transform_overwrite: bool = False,
                  **kwargs):
         """Initialize NortekAsciiReader.
         
@@ -100,6 +104,17 @@ class NortekAsciiReader(AbstractReader):
             Path to the .hdr file.
         mapping : dict, optional
             Variable name mapping dictionary.
+        target_coordinate_system : str, optional
+            Optional target velocity coordinate system (``BEAM``, ``XYZ`` or
+            ``ENU``). If omitted, no coordinate transformation is applied.
+        pointing_down : bool or str, optional
+            Instrument orientation for BEAM transformations. If omitted,
+            SeaSenseLib uses ``status_code`` bit 0 when available.
+        coordinate_transform_keep_source : bool, default=False
+            Keep the original velocity component variables after creating the
+            transformed variables.
+        coordinate_transform_overwrite : bool, default=False
+            Allow existing target velocity variables to be replaced.
         **kwargs
             Additional base class parameters:
             
@@ -112,6 +127,10 @@ class NortekAsciiReader(AbstractReader):
             - sort_variables : bool, default=True
                 Whether to sort variables alphabetically.
         """
+        self._target_coordinate_system = target_coordinate_system
+        self._coordinate_transform_pointing_down = pointing_down
+        self._coordinate_transform_keep_source = coordinate_transform_keep_source
+        self._coordinate_transform_overwrite = coordinate_transform_overwrite
         super().__init__(dat_file_path, mapping, input_header_file=header_file_path, **kwargs)
         self._nortek_header_settings = {}
         self._raw_metadata_blocks = {}
@@ -452,9 +471,62 @@ class NortekAsciiReader(AbstractReader):
         ds = self._create_xarray_dataset(data, columns, settings)
         return ds
 
+    def pipeline_transformations(self, ds: xr.Dataset) -> list:
+        """Return reader-provided transformations for the pipeline.
+
+        The base reader calls this hook after ``_load_data()`` and before the
+        transformation stage runs. By then the Nortek header has already been
+        parsed and stored in ``_raw_metadata_blocks``, so the transformation
+        handler can read the BEAM-to-XYZ matrix from the normal pipeline
+        metadata context. This method only decides whether a transformation was
+        requested by the caller and passes through the reader-level options.
+
+        If no target coordinate system was requested, no handler is returned and
+        the default read path remains unchanged.
+        """
+        if not self._target_coordinate_system:
+            return []
+
+        # Import lazily to keep ordinary reader imports light and to avoid a
+        # module-level dependency cycle with the transformation package.
+        from seasenselib.pipeline.transformation.handlers import (
+            NortekCoordinateTransformation,
+        )
+
+        return [
+            NortekCoordinateTransformation(
+                target_coordinate_system=self._target_coordinate_system,
+                pointing_down=self._coordinate_transform_pointing_down,
+                keep_source=self._coordinate_transform_keep_source,
+                overwrite=self._coordinate_transform_overwrite,
+            )
+        ]
+
     def _postprocess_after_pipeline(self, ds: xr.Dataset) -> xr.Dataset:
-        """Restore Nortek-specific metadata after the generic pipeline."""
-        coordinate_system = self._nortek_header_settings.get("coordinate_system")
+        """Restore the final Nortek coordinate-system attribute.
+
+        The finalization stage moves most reader/header-specific global
+        attributes into ``raw_metadata``. ``coordinate_system`` is kept as a
+        plain global attribute because downstream users need to know the current
+        velocity frame without parsing the RAW metadata container.
+
+        If the optional transformation ran, the processing metadata contains the
+        final target coordinate system. Otherwise the dataset should keep the
+        coordinate system declared in the Nortek header.
+        """
+        from seasenselib.pipeline.transformation.handlers import (
+            transformed_coordinate_system_from_metadata,
+        )
+
+        # Prefer the transformation record over the original header value:
+        # after BEAM -> XYZ/ENU, the header still describes the source frame.
+        coordinate_system = transformed_coordinate_system_from_metadata(
+            self._processing_metadata
+        )
+        coordinate_system = (
+            coordinate_system
+            or self._nortek_header_settings.get("coordinate_system")
+        )
         if coordinate_system:
             ds.attrs["coordinate_system"] = coordinate_system
         return ds
