@@ -1,4 +1,4 @@
-git Developers Guide
+Developers Guide
 ================
 
 This guide provides detailed information about using SeaSenseLib for oceanographic data processing, including both modern and legacy APIs for users who need advanced control or are extending the library.
