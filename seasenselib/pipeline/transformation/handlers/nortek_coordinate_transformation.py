@@ -257,10 +257,12 @@ class NortekCoordinateTransformation(ITransformation):
             ("nortek_pointing_down", "pointing_down"),
         )
         if attr_value is not None:
-            return _PointingDownInfo(
-                values=bool(_optional_bool(attr_value)),
-                source="dataset.attrs.pointing_down",
-            )
+            parsed = _optional_bool(attr_value)
+            if parsed is not None:
+                return _PointingDownInfo(
+                    values=parsed,
+                    source="dataset.attrs.pointing_down",
+                )
 
         status = _status_bit0(dataset, template)
         if status is not None:
