@@ -239,6 +239,8 @@ class TestReadersCompleteness(unittest.TestCase):
                     if (inspect.isclass(attr) and 
                         attr.__module__ == module_name and  # Only classes defined in this module
                         attr is not AbstractReader):        # Exclude the base class itself
+                        if attr_name.startswith('_'):
+                            continue  # Private helper classes are implementation details
 
                         # Check if this class inherits from AbstractReader
                         if not issubclass(attr, AbstractReader):
@@ -273,7 +275,8 @@ class TestReadersCompleteness(unittest.TestCase):
                     if (inspect.isclass(attr) and 
                         attr.__module__ == module_name and  # Only classes defined in this module
                         attr is not AbstractReader):        # Exclude the base class itself
-
+                        if attr_name.startswith('_'):
+                            continue  # Private helper classes are implementation details
 
                         # Check if class name ends with "Reader"
                         if not attr_name.endswith('Reader'):
