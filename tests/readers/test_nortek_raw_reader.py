@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import io
 import json
 import os
+import struct
 import sys
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
@@ -19,6 +21,59 @@ def _write_raw_file(tmp_path, suffix=".aqd"):
     raw_file = tmp_path / f"sample{suffix}"
     raw_file.write_bytes(b"\xa5\x05\x18\x00")
     return raw_file
+
+
+def _write_nortek2_avgd_file(tmp_path):
+    raw_file = tmp_path / "sample_avgd.aqd"
+    config_text = (
+        'GETCLOCKSTR,TIME="2026-05-03 11:11:25",OFFSET="+00:00",TZ="UTC"\r\n'
+        'ID,STR="Aquadopp Deep Water 2 MHz D2VC",SN=401928\r\n'
+        'GETAVG,NC=1,CS=0.75,BD=0.50,CY="ENU",DF=7,NPING=12,NB=3\r\n'
+    )
+    string_payload = b"\x12" + config_text.encode("utf-8") + b"\x00"
+    data_payload = bytearray(191)
+    data_payload[16] = 3
+    struct.pack_into("<I", data_payload, 20, 401928)
+    struct.pack_into("<6BH", data_payload, 24, 126, 4, 7, 0, 0, 0, 0)
+    for offset, value in (
+        (32, 1490.95),
+        (36, 2.4270833),
+        (40, 1873.0679),
+        (44, 1882.5684),
+        (48, 46.52165),
+        (52, -4.03931),
+        (56, -3.87268),
+        (80, 0.75),
+        (84, 0.5),
+        (88, 12.29582),
+        (92, 1.88333),
+        (96, 4.2),
+        (100, 2.0),
+        (104, 986.0),
+        (108, 1006.0),
+        (112, -4252.0),
+        (116, -0.07043),
+        (120, -0.06732),
+        (124, 0.99402),
+        (128, 5.03699),
+        (148, 0.29405),
+        (152, 347.4289),
+    ):
+        struct.pack_into("<f", data_payload, offset, value)
+    struct.pack_into("<3h", data_payload, 160, -64, 287, -21)
+    data_payload[166:169] = bytes([105, 92, 93])
+    data_payload[169:172] = bytes([97, 93, 93])
+    data_payload[172] = 100
+
+    raw_file.write_bytes(
+        _nortek2_packet(160, string_payload)
+        + _nortek2_packet(38, bytes(data_payload))
+    )
+    return raw_file
+
+
+def _nortek2_packet(record_id, payload):
+    return struct.pack("<BBBBhhh", 165, 10, record_id, 48, len(payload), 0, 0) + payload
 
 
 def _dolfyn_like_dataset(
@@ -106,12 +161,102 @@ def _dolfyn_like_dataset(
     )
 
 
+def _dolfyn_like_nortek2_dataset():
+    return xr.Dataset(
+        {
+            "vel_avg": (
+                ("dir", "range_avg", "time_avg"),
+                np.array([[[-0.085]], [[0.256]], [[-0.008]]], dtype=np.float32),
+                {"units": "m s-1"},
+            ),
+            "amp_avg": (
+                ("beam", "range_avg", "time_avg"),
+                np.array([[[48.5]], [[46.5]], [[46.5]]], dtype=np.float32),
+                {"units": "1"},
+            ),
+            "corr_avg": (
+                ("beam", "range_avg", "time_avg"),
+                np.array([[[93]], [[84]], [[89]]], dtype=np.uint8),
+                {"units": "%"},
+            ),
+            "temp_avg": ("time_avg", np.array([2.43]), {"units": "degree_C"}),
+            "c_sound_avg": ("time_avg", np.array([1491.0]), {"units": "m s-1"}),
+            "pressure_avg": ("time_avg", np.array([1873.007]), {"units": "dbar"}),
+            "batt_avg": ("time_avg", np.array([11.8]), {"units": "V"}),
+            "heading_avg": (
+                "time_avg",
+                np.array([47.17]),
+                {"units": "degree", "standard_name": "platform_orientation"},
+            ),
+            "pitch_avg": (
+                "time_avg",
+                np.array([-5.03]),
+                {"units": "degree", "standard_name": "platform_pitch"},
+            ),
+            "roll_avg": (
+                "time_avg",
+                np.array([-4.25]),
+                {"units": "degree", "standard_name": "platform_roll"},
+            ),
+        },
+        coords={
+            "dir": ("dir", ["E", "N", "U"]),
+            "beam": ("beam", [1, 2, 3]),
+            "range_avg": ("range_avg", [1.25]),
+            "time_avg": (
+                "time_avg",
+                np.array(["2026-05-07T00:00:00.001700"], dtype="datetime64[ns]"),
+                {"units": "seconds since 1970-01-01 00:00:00 UTC"},
+            ),
+        },
+        attrs={
+            "coord_sys": "earth",
+            "coord_sys_axes_avg": "ENU",
+            "inst_make": "Nortek",
+            "inst_model": "Aquadopp Deep Water 2 MHz D2VC",
+            "serial_number": "401928",
+        },
+    )
+
+
 def _install_fake_mhkit(monkeypatch, read_nortek):
     mhkit = ModuleType("mhkit")
     mhkit.dolfyn = SimpleNamespace(
         io=SimpleNamespace(nortek=SimpleNamespace(read_nortek=read_nortek))
     )
     monkeypatch.setitem(sys.modules, "mhkit", mhkit)
+
+
+def _install_fake_mhkit_with_nortek2_modules(
+    monkeypatch,
+    read_signature,
+    reader_class=None,
+):
+    mhkit = ModuleType("mhkit")
+    dolfyn = ModuleType("mhkit.dolfyn")
+    io_module = ModuleType("mhkit.dolfyn.io")
+    nortek = ModuleType("mhkit.dolfyn.io.nortek")
+    nortek2 = ModuleType("mhkit.dolfyn.io.nortek2")
+
+    def fail_classic_reader(filename, **kwargs):
+        raise AssertionError("classic Nortek decoder should not be called")
+
+    read_signature.__module__ = "mhkit.dolfyn.io.nortek2"
+    nortek.read_nortek = fail_classic_reader
+    nortek2.read_signature = read_signature
+    if reader_class is not None:
+        nortek2._Ad2cpReader = reader_class
+    io_module.nortek = nortek
+    io_module.nortek2 = nortek2
+    dolfyn.io = io_module
+    mhkit.dolfyn = dolfyn
+
+    monkeypatch.setitem(sys.modules, "mhkit", mhkit)
+    monkeypatch.setitem(sys.modules, "mhkit.dolfyn", dolfyn)
+    monkeypatch.setitem(sys.modules, "mhkit.dolfyn.io", io_module)
+    monkeypatch.setitem(sys.modules, "mhkit.dolfyn.io.nortek", nortek)
+    monkeypatch.setitem(sys.modules, "mhkit.dolfyn.io.nortek2", nortek2)
+    return nortek2
 
 
 def _install_fake_mhkit_with_nortek_modules(monkeypatch, read_nortek):
@@ -250,8 +395,11 @@ def test_nortek_raw_reader_wraps_mhkit_dolfyn(monkeypatch, tmp_path, capsys):
             "nens": 2,
             "debug": True,
             "do_checksum": True,
+            "rebuild_index": None,
+            "dual_profile": None,
             "show_decoder_output": False,
             "apply_aquadopp_compatibility": True,
+            "apply_nortek2_aquadopp_compatibility": True,
         },
     }
     assert "attributes" not in reader._raw_metadata_blocks
@@ -376,6 +524,201 @@ def test_nortek_raw_reader_loads_through_public_api_autodetect(
 
     assert "vel" in ds
     assert calls == [(str(raw_file), {"nens": 1})]
+
+
+def test_nortek_raw_reader_uses_nortek2_decoder_for_gen2_header(
+    monkeypatch,
+    tmp_path,
+):
+    raw_file = tmp_path / "sample.aqd"
+    raw_file.write_bytes(b"\xa5\x0a\x00\x00")
+    expected = _dolfyn_like_nortek2_dataset()
+    calls = []
+
+    def fake_read_signature(
+        filename,
+        userdata=True,
+        nens=None,
+        rebuild_index=False,
+        debug=False,
+        dual_profile=False,
+    ):
+        print(f"Reading file {filename} ...")
+        calls.append(
+            {
+                "filename": filename,
+                "userdata": userdata,
+                "nens": nens,
+                "rebuild_index": rebuild_index,
+                "debug": debug,
+                "dual_profile": dual_profile,
+            }
+        )
+        return expected
+
+    _install_fake_mhkit_with_nortek2_modules(monkeypatch, fake_read_signature)
+
+    reader = NortekRawReader(
+        str(raw_file),
+        userdata=False,
+        nens=5,
+        rebuild_index=True,
+        debug=True,
+        dual_profile=False,
+        perform_default_postprocessing=False,
+    )
+
+    assert "vel_avg" in reader.data
+    assert calls == [
+        {
+            "filename": str(raw_file),
+            "userdata": False,
+            "nens": 5,
+            "rebuild_index": True,
+            "debug": True,
+            "dual_profile": False,
+        }
+    ]
+    assert reader._raw_metadata_blocks["configuration"]["decoder"] == (
+        "mhkit.dolfyn.io.nortek2.read_signature"
+    )
+    hints = reader._raw_metadata_blocks["mapping_notes"]
+    assert hints["safe_reader_mappings"]["temp_avg"] == "temperature"
+    assert hints["safe_reader_mappings"]["pressure_avg"] == "pressure"
+    assert reader.data["time_avg"].attrs["original_units"] == (
+        "seconds since 1970-01-01 00:00:00 UTC"
+    )
+    assert reader.data["heading_avg"].attrs["standard_name"] == (
+        "platform_heading_angle"
+    )
+
+
+def test_nortek_raw_reader_repairs_gen2_aquadopp_average_tail(
+    monkeypatch,
+    tmp_path,
+):
+    raw_file = tmp_path / "sample.aqd"
+    raw_file.write_bytes(b"\xa5\x0a\x00\x00")
+
+    class FakeAd2cpReader:
+        def __init__(self):
+            placeholders = b"\x01\x00\x80\x7f" * 3
+            velocity = np.array([-85, 256, -8], dtype="<i2").tobytes()
+            amplitude = np.array([97, 93, 93], dtype=np.uint8).tobytes()
+            correlation = np.array([93, 84, 89], dtype=np.uint8).tobytes()
+            self.f = io.BytesIO(
+                b"\x00" * 10
+                + b"\x00" * 88
+                + placeholders
+                + velocity
+                + amplitude
+                + correlation
+            )
+
+        def _read_hdr(self, do_cs=False):
+            self.f.seek(10)
+            return {"sync": 165, "hsz": 10, "id": 22, "sz": 112}
+
+        def _read_burst(self, record_id, data, ensemble_index, echo=False):
+            self.f.read(88)
+            data["vel"][..., ensemble_index] = np.array([[1], [32640], [1]])
+            data["amp"][..., ensemble_index] = np.array([[64], [63], [0]])
+            data["corr"][..., ensemble_index] = np.array([[0], [128], [127]])
+
+    def fake_read_signature(filename, **kwargs):
+        from mhkit.dolfyn.io import nortek2
+
+        reader = nortek2._Ad2cpReader()
+        data = {
+            "DatOffset": np.array([76], dtype=np.uint8),
+            "vel": np.zeros((3, 1, 1), dtype=np.int16),
+            "amp": np.zeros((3, 1, 1), dtype=np.uint8),
+            "corr": np.zeros((3, 1, 1), dtype=np.uint8),
+        }
+        header = reader._read_hdr()
+        reader._read_burst(header["id"], data, 0)
+
+        assert reader.f.tell() == 122
+        np.testing.assert_array_equal(data["vel"][..., 0], [[-85], [256], [-8]])
+        np.testing.assert_array_equal(data["amp"][..., 0], [[97], [93], [93]])
+        np.testing.assert_array_equal(data["corr"][..., 0], [[93], [84], [89]])
+        return _dolfyn_like_nortek2_dataset()
+
+    _install_fake_mhkit_with_nortek2_modules(
+        monkeypatch,
+        fake_read_signature,
+        FakeAd2cpReader,
+    )
+
+    reader = NortekRawReader(str(raw_file), perform_default_postprocessing=False)
+
+    assert "vel_avg" in reader.data
+    assert reader._raw_metadata_blocks["configuration"]["compatibility"] == [
+        {
+            "name": "nortek2_aquadopp_average_record_tail",
+            "scope": "in_memory_for_this_read",
+            "reason": (
+                "Repairs AD2CP/Aquadopp2 average records where DOLfYN's "
+                "layout leaves the final velocity, amplitude and correlation "
+                "samples unread."
+            ),
+        }
+    ]
+
+
+def test_nortek_raw_reader_decodes_nortek2_avgd_product_without_dolfyn(
+    monkeypatch,
+    tmp_path,
+):
+    raw_file = _write_nortek2_avgd_file(tmp_path)
+
+    def fail_import(name, *args, **kwargs):
+        if name.startswith("mhkit"):
+            raise AssertionError("DOLfYN should not be imported for ID 38 products")
+        return original_import(name, *args, **kwargs)
+
+    original_import = __import__
+    monkeypatch.setattr("builtins.__import__", fail_import)
+
+    reader = NortekRawReader(str(raw_file), perform_default_postprocessing=False)
+    ds = reader.data
+
+    assert dict(ds.sizes) == {
+        "time_avg": 1,
+        "range_avg": 1,
+        "beam": 3,
+        "dir": 3,
+        "dirIMU": 3,
+    }
+    assert reader._raw_metadata_blocks["configuration"]["decoder"] == (
+        "seasenselib.nortek2.avgd"
+    )
+    assert ds.attrs["inst_model"] == "Aquadopp Deep Water 2 MHz D2VC"
+    assert ds.attrs["coord_sys"] == "earth"
+    assert str(ds["time_avg"].values[0]) == "2026-05-07T00:00:00.000000000"
+    assert ds["range_avg"].values[0] == pytest.approx(1.25)
+    assert ds["c_sound_avg"].values[0] == pytest.approx(1490.95, abs=1e-4)
+    assert ds["temp_avg"].values[0] == pytest.approx(2.4270833, abs=1e-6)
+    assert ds["pressure_avg"].values[0] == pytest.approx(1873.0679, abs=1e-4)
+    assert ds["batt_avg"].values[0] == pytest.approx(12.29582, abs=1e-5)
+    np.testing.assert_allclose(
+        ds["vel_avg"].isel(range_avg=0, time_avg=0).values,
+        [-0.064, 0.287, -0.021],
+        atol=1e-6,
+    )
+    np.testing.assert_allclose(
+        ds["amp_avg"].isel(range_avg=0, time_avg=0).values,
+        [52.5, 46.0, 46.5],
+        atol=1e-6,
+    )
+    np.testing.assert_array_equal(
+        ds["corr_avg"].isel(range_avg=0, time_avg=0).values,
+        [97, 93, 93],
+    )
+    assert reader._raw_metadata_blocks["mapping_notes"]["safe_reader_mappings"][
+        "temp_avg"
+    ] == "temperature"
+    assert "vel_avg" in reader._raw_metadata_blocks["mapping_notes"]["not_mapped"]
 
 
 @pytest.mark.parametrize("suffix", [".VEC", ".wpr"])
