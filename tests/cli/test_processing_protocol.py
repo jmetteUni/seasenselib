@@ -1,6 +1,7 @@
 import argparse
 import json
 
+import numpy as np
 import xarray as xr
 
 from seasenselib.cli.commands.data_commands import _write_processing_protocol, ShowCommand
@@ -27,6 +28,14 @@ def test_processing_protocol_written(tmp_path):
     metadata = {
         "stages_applied": ["mapping", "finalization"],
         "unit_conversions": ["temperature: degC -> K"],
+        "transformations": [
+            {
+                "handler": "example",
+                "transformation": "example_transform",
+                "description": "Example transformation.",
+                "variables": ["temperature"],
+            }
+        ],
         "warnings": ["example warning"],
     }
 
@@ -41,6 +50,7 @@ def test_processing_protocol_written(tmp_path):
     assert payload["pipeline_profile"] == "default"
     assert payload["stages_applied"] == ["mapping", "finalization"]
     assert payload["unit_conversions"] == {"temperature": ["degC -> K"]}
+    assert payload["transformations"][0]["transformation"] == "example_transform"
     assert "temperature" in payload["data_variables"]
 
 
@@ -88,3 +98,58 @@ def test_show_writes_processing_protocol(tmp_path):
     assert payload["command"] == "show"
     assert payload["input_file"] == "input.cnv"
     assert payload["stages_applied"] == ["mapping"]
+
+
+def test_show_example_uses_bounded_xarray_preview(monkeypatch, capsys):
+    dataset = xr.Dataset(
+        {
+            "vel": (
+                ("dir", "range", "time"),
+                np.arange(4 * 40 * 100).reshape(4, 40, 100),
+            ),
+            "temperature": ("time", np.arange(100)),
+        },
+        coords={
+            "dir": ("dir", [1, 2, 3, 4]),
+            "range": ("range", np.arange(40)),
+            "time": ("time", np.arange(100)),
+        },
+    )
+
+    def fail_to_dataframe(self, *args, **kwargs):
+        raise AssertionError("show example must not materialize the full DataFrame")
+
+    class DummyIO:
+        def read_data(self, *args, **kwargs):
+            return dataset
+
+    monkeypatch.setattr(xr.Dataset, "to_dataframe", fail_to_dataframe)
+
+    args = argparse.Namespace(
+        input="large.nc",
+        input_format=None,
+        header_input=None,
+        schema="example",
+        mapping=None,
+        no_sanitize=False,
+        no_fix_coords=False,
+        raw_only=False,
+        pipeline_profile=None,
+        pipeline_file=None,
+        pipeline_apply_stages=None,
+        pipeline_skip_stages=None,
+        pipeline_apply_handlers=None,
+        pipeline_skip_handlers=None,
+        metadata=None,
+        metadata_file=None,
+        reader_args=None,
+        processing_protocol=None,
+    )
+
+    result = ShowCommand(DummyIO()).execute(args)
+
+    assert result.success
+    output = capsys.readouterr().out
+    assert "Example values" in output
+    assert "vel [dir=1, range=0, time=0:5]" in output
+    assert "temperature [time=0:5]" in output

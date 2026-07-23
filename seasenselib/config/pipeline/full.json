@@ -22,6 +22,14 @@
       }
     },
     {
+      "name": "transformation",
+      "config": {
+        "handlers": [
+          "reader"
+        ]
+      }
+    },
+    {
       "name": "derivation",
       "config": {
         "handlers": [

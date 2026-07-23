@@ -144,18 +144,14 @@ def _build_stage_kwargs(args):
     
     # Check for --pipeline-skip-stages argument
     elif getattr(args, 'pipeline_skip_stages', None):
-        # Build a list of all steps except the skipped ones
         skip = [s.strip() for s in args.pipeline_skip_stages.split(',')]
         try:
-            from ...pipeline.registry import StageRegistry
             from ...pipeline.config import PipelineConfig
-            registry = StageRegistry.get_instance()
-            all_steps = registry.list_stages()
-            selected_steps = [s for s in all_steps if s not in skip]
-            # Build pipeline config with selected steps
-            config = PipelineConfig()
-            for step_name in selected_steps:
-                config.add_stage(step_name)
+            config = PipelineConfig.from_resource("default")
+            config.pipeline = [
+                stage for stage in config.pipeline
+                if stage.name not in skip
+            ]
             stage_kwargs['pipeline_config'] = config
         except Exception:
             # If registry fails, just pass the skip info and let read() handle it
@@ -272,6 +268,7 @@ def _write_processing_protocol(
         protocol["handlers_applied"] = metadata.get("handlers_applied")
         protocol["variable_mappings"] = metadata.get("variable_mappings")
         protocol["derived_parameters"] = metadata.get("derived_parameters")
+        protocol["transformations"] = metadata.get("transformations")
         unit_conversions = _format_unit_conversions(metadata.get("unit_conversions"))
         if unit_conversions is not None:
             protocol["unit_conversions"] = unit_conversions
@@ -294,6 +291,112 @@ def _write_processing_protocol(
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as f:
         json.dump(protocol, f, indent=2, sort_keys=True)
+
+
+def _format_example_value(value) -> str:
+    """Format one scalar preview value without verbose dtype wrappers."""
+    try:
+        import numpy as np
+    except Exception:
+        np = None
+
+    if np is not None:
+        if isinstance(value, np.datetime64):
+            return np.datetime_as_string(value)
+        if isinstance(value, np.timedelta64):
+            return str(value)
+        if isinstance(value, np.generic):
+            value = value.item()
+
+    if isinstance(value, bytes):
+        try:
+            return value.decode("utf-8")
+        except UnicodeDecodeError:
+            return value.hex()
+    if isinstance(value, float):
+        return f"{value:.6g}"
+    return str(value)
+
+
+def _example_selector(array, max_values: int) -> tuple[dict, str, int]:
+    """Return a small indexer and sampled dimension for an array preview."""
+    if not array.dims:
+        return {}, "", 1
+
+    sample_dim = "time" if "time" in array.dims else array.dims[-1]
+    sample_count = min(int(array.sizes[sample_dim]), max_values)
+    indexer = {}
+    for dim in array.dims:
+        if dim == sample_dim:
+            indexer[dim] = slice(0, sample_count)
+        else:
+            indexer[dim] = 0
+    return indexer, sample_dim, sample_count
+
+
+def _format_example_selector(array, indexer: dict, sample_dim: str) -> str:
+    """Describe the small indexer used for an example preview."""
+    if not array.dims:
+        return ""
+
+    parts = []
+    for dim in array.dims:
+        selector = indexer[dim]
+        if dim == sample_dim:
+            parts.append(f"{dim}=0:{selector.stop}")
+            continue
+
+        label = "0"
+        if dim in array.coords and array.coords[dim].size:
+            try:
+                label = _format_example_value(array.coords[dim].isel({dim: 0}).values)
+            except Exception:
+                label = "0"
+        parts.append(f"{dim}={label}")
+    return ", ".join(parts)
+
+
+def _format_array_example(name: str, array, max_values: int = 5) -> str:
+    """Format a bounded example line for one xarray coordinate or variable."""
+    indexer, sample_dim, _sample_count = _example_selector(array, max_values)
+    subset = array.isel(indexer) if indexer else array
+
+    try:
+        values = subset.values
+    except Exception as exc:
+        return f"  {name}: <failed to read preview: {exc}>"
+
+    try:
+        import numpy as np
+        flat = np.asarray(values).reshape(-1)
+    except Exception:
+        flat = [values]
+
+    preview = ", ".join(
+        _format_example_value(value)
+        for value in list(flat)[:max_values]
+    )
+    selector_text = _format_example_selector(array, indexer, sample_dim)
+    selector_text = f" [{selector_text}]" if selector_text else ""
+    return (
+        f"  {name}{selector_text}: dims={array.dims}, "
+        f"shape={tuple(array.shape)}, values=[{preview}]"
+    )
+
+
+def _print_dataset_example(dataset, max_values: int = 5) -> None:
+    """Print bounded examples without materializing the whole Dataset."""
+    print(f"Example values (up to {max_values} values per variable):")
+
+    if dataset.coords:
+        print("\nCoordinates:")
+        for name, array in dataset.coords.items():
+            print(_format_array_example(name, array, max_values=max_values))
+
+    if dataset.data_vars:
+        print("\nData variables:")
+        for name, array in dataset.data_vars.items():
+            print(_format_array_example(name, array, max_values=max_values))
 
 
 class ConvertCommand(BaseCommand):
@@ -428,8 +531,7 @@ class ShowCommand(BaseCommand):
             elif args.schema == 'info':
                 data.info()
             elif args.schema == 'example':
-                df = data.to_dataframe()
-                print(df.head())
+                _print_dataset_example(data)
 
             # Write processing protocol if requested
             if want_protocol:

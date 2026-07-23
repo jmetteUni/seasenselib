@@ -46,7 +46,15 @@ def test_build_stage_kwargs_skip_stages():
     stage_kwargs = _build_stage_kwargs(args)
     cfg = stage_kwargs["pipeline_config"]
     names = [stage.name for stage in cfg.pipeline]
-    assert "validation" not in names
+    assert names == [
+        "mapping",
+        "unit_handling",
+        "transformation",
+        "derivation",
+        "metadata_extraction",
+        "metadata_enrichment",
+        "finalization",
+    ]
 
 
 def test_build_stage_kwargs_apply_handlers():

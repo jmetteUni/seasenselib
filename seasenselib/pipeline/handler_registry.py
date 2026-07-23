@@ -17,6 +17,7 @@ HANDLER_GROUP_MAPPING = "seasenselib.pipeline.mapping_strategies"
 HANDLER_GROUP_DERIVATIONS = "seasenselib.pipeline.derivations"
 HANDLER_GROUP_METADATA_EXTRACTORS = "seasenselib.pipeline.metadata_extractors"
 HANDLER_GROUP_CONVENTIONS = "seasenselib.pipeline.conventions"
+HANDLER_GROUP_TRANSFORMATIONS = "seasenselib.pipeline.transformations"
 HANDLER_GROUP_VALIDATORS = "seasenselib.pipeline.validators"
 
 
@@ -85,5 +86,6 @@ __all__ = [
     "HANDLER_GROUP_DERIVATIONS",
     "HANDLER_GROUP_METADATA_EXTRACTORS",
     "HANDLER_GROUP_CONVENTIONS",
+    "HANDLER_GROUP_TRANSFORMATIONS",
     "HANDLER_GROUP_VALIDATORS",
 ]

@@ -19,6 +19,7 @@ from .handler_registry import (
     HANDLER_GROUP_DERIVATIONS,
     HANDLER_GROUP_METADATA_EXTRACTORS,
     HANDLER_GROUP_CONVENTIONS,
+    HANDLER_GROUP_TRANSFORMATIONS,
     HANDLER_GROUP_VALIDATORS,
 )
 from .interfaces import (
@@ -26,6 +27,7 @@ from .interfaces import (
     IDerivation,
     IMetadataExtractor,
     IConvention,
+    ITransformation,
     IValidator,
 )
 
@@ -56,6 +58,9 @@ BUILTIN_HANDLERS: Dict[str, Dict[str, str]] = {
         "normalize": "seasenselib.pipeline.unit_handling.handlers.unit_normalizer.UnitNormalizer",
         "convert": "seasenselib.pipeline.unit_handling.handlers.unit_converter.UnitConverter",
     },
+    "transformation": {
+        "reader": "seasenselib.pipeline.transformation.handlers.reader_transformations.ReaderTransformations",
+    },
     "metadata_enrichment": {
         "cf": "seasenselib.pipeline.metadata_enrichment.handlers.cf_convention.CFConvention",
         "acdd": "seasenselib.pipeline.metadata_enrichment.handlers.acdd_convention.ACDDConvention",
@@ -81,6 +86,7 @@ PLUGIN_GROUPS: Dict[str, Tuple[str, Type]] = {
     "derivation": (HANDLER_GROUP_DERIVATIONS, IDerivation),
     "metadata_extraction": (HANDLER_GROUP_METADATA_EXTRACTORS, IMetadataExtractor),
     "metadata_enrichment": (HANDLER_GROUP_CONVENTIONS, IConvention),
+    "transformation": (HANDLER_GROUP_TRANSFORMATIONS, ITransformation),
     "validation": (HANDLER_GROUP_VALIDATORS, IValidator),
 }
 

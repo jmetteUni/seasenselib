@@ -149,5 +149,9 @@ class GlobalAttributes:
         if 'derived_parameters' in context.metadata:
             derived = ', '.join(context.metadata['derived_parameters'])
             parts.append(f"Derived: {derived}")
+
+        if 'transformations' in context.metadata:
+            count = len(context.metadata['transformations'])
+            parts.append(f"Transformed: {count} step(s)")
         
         return '; '.join(parts)

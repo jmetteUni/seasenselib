@@ -6,6 +6,7 @@ This module defines the core interfaces for different stage groups:
 - IMetadataExtractor: Metadata extraction from various sources
 - IConvention: Standards-compliant metadata enrichment
 - IDerivation: Parameter derivation with dependency resolution
+- ITransformation: Data/value transformations with provenance
 - IValidator: Standards validation
 
 Each interface represents a distinct concern in the data transformation pipeline.
@@ -13,6 +14,7 @@ Each interface represents a distinct concern in the data transformation pipeline
 
 from __future__ import annotations
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any
 import xarray as xr
 
@@ -344,6 +346,93 @@ class IDerivation(ABC):
         -------
         Dict[str, Any]
             Metadata dictionary with units, standard_name, etc.
+        """
+        pass
+
+
+# ============================================================================
+# Transformation Interface
+# ============================================================================
+
+@dataclass
+class TransformationRecord:
+    """Structured provenance for one applied data transformation."""
+
+    transformation: str
+    description: str
+    variables: List[str] = field(default_factory=list)
+    parameters: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert the record to a JSON-friendly dictionary."""
+        data: Dict[str, Any] = {
+            "transformation": self.transformation,
+            "description": self.description,
+        }
+        if self.variables:
+            data["variables"] = list(self.variables)
+        if self.parameters:
+            data["parameters"] = dict(self.parameters)
+        return data
+
+
+class ITransformation(ABC):
+    """
+    Interface for dataset transformations.
+
+    Transformations change data values, coordinates, or data structure after
+    units have been normalized and before validation. Implementations must
+    return structured transformation records so the processing protocol and
+    output metadata remain reproducible.
+    """
+
+    @abstractmethod
+    def name(self) -> str:
+        """
+        Get the transformation handler name.
+
+        Returns
+        -------
+        str
+            Stable handler name used in processing metadata.
+        """
+        pass
+
+    def can_transform(
+        self,
+        dataset: xr.Dataset,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> bool:
+        """
+        Return whether this transformation can run for the dataset.
+
+        The default allows the transformation to run. Handlers should override
+        this when they require specific variables, coordinate systems, or
+        reader metadata.
+        """
+        return True
+
+    @abstractmethod
+    def transform(
+        self,
+        dataset: xr.Dataset,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> tuple[xr.Dataset, List[TransformationRecord | Dict[str, Any]]]:
+        """
+        Transform the dataset and return structured provenance records.
+
+        Parameters
+        ----------
+        dataset : xr.Dataset
+            Dataset to transform.
+        context : Dict[str, Any], optional
+            Pipeline metadata context.
+
+        Returns
+        -------
+        tuple[xr.Dataset, list]
+            The transformed dataset and one or more transformation records.
+            Return an empty record list when no transformation was applied.
         """
         pass
 
