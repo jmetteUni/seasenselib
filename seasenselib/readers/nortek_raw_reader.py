@@ -504,9 +504,7 @@ class _Nortek2AvgdProductDecoder:
             payload,
             24,
         )
-        velocity = np.frombuffer(payload, dtype="<i2", count=3, offset=160).astype(
-            np.float32
-        )
+        velocity = np.frombuffer(payload, dtype="<i2", count=3, offset=_NORTEK2_AVGD_VECTOR_OFFSET).astype(np.float32)
         amplitude = np.frombuffer(
             payload,
             dtype=np.uint8,
