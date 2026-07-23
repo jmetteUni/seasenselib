@@ -66,8 +66,14 @@ class TransformationStage(Stage):
 
         handlers = config.get("handlers")
         if "handlers" in config:
-            self._handler_order = list(handlers or [])
-
+            if handlers is None:
+                self._handler_order = []
+            elif isinstance(handlers, str):
+                self._handler_order = [handlers]
+            elif isinstance(handlers, list):
+                self._handler_order = list(handlers)
+            else:
+                self._handler_order = []
         if self._explicit_transformations is not None and "handlers" not in config:
             transformations = list(self._explicit_transformations)
         else:
